@@ -1,0 +1,114 @@
+services:
+  # --- DATABASE SERVICE ---
+  gashub-db:
+    image: mysql:8.4
+    command: ["mysqld", "--mysql-native-password=ON"]
+    container_name: gashub-db
+    restart: always
+    env_file:
+      - .env
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - ./mysql-data:/var/lib/mysql
+      - ./mysql-init:/docker-entrypoint-initdb.d
+    networks:
+      - internal_net
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+          cpus: '0.50'
+        reservations:
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$${MYSQL_ROOT_PASSWORD}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # --- BACKEND API SERVICE ---
+  gashub-api:
+    build:
+      context: ./backend
+      target: ${APP_ENV}
+    container_name: gashub-api
+    restart: unless-stopped
+    expose:
+      - "${API_PORT}"
+    env_file:
+      - .env
+    environment:
+      DB_HOST: gashub-db
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      PORT: ${API_PORT}
+      JWT_SECRET: ${JWT_SECRET}
+      NODE_ENV: ${APP_ENV}
+      APP_ENV: ${APP_ENV}
+    depends_on:
+      - gashub-db
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    networks:
+      - internal_net 
+      - proxy_net    
+    deploy:
+      resources:
+        limits:
+          memory: 1024M   # Limite per Node.js Backend
+          cpus: '0.50'
+        reservations:
+          memory: 512M
+    healthcheck:
+      # Robustezza: usa la variabile PORT per il controllo
+      test: ["CMD-SHELL", "nc -z localhost ${API_PORT} || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+
+  # --- FRONTEND SERVICE ---
+  gashub-frontend:
+    build:
+      context: ./frontend
+      target: ${APP_ENV}
+    container_name: gashub-frontend
+    restart: unless-stopped
+    expose:
+      - "80"
+    env_file:
+      - .env
+    environment:
+      - VITE_API_URL=${VITE_API_URL}
+      - VITE_APP_ENV=${APP_ENV}
+    depends_on:
+      - gashub-api
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - proxy_net
+    deploy:
+      resources:
+        limits:
+          memory: 512M    # Aumentato a 512M per evitare il freeze (99% RAM)
+          cpus: '0.30'    # Aumentata CPU per velocizzare il caricamento
+        reservations:
+          memory: 256M
+
+# --- NETWORKS ---
+networks:
+  internal_net:
+    driver: bridge
+    internal: true 
+
+  proxy_net:
+    external: true
+    name: ${PROXY_NETWORK_NAME}
