@@ -1,0 +1,14 @@
+{
+  "watch": ["."],
+  "ext": "js,json",
+  "ignore": [
+    "node_modules",
+    "logs/*",
+    "*.log",
+    "test/*",
+    ".git",
+    "public/uploads/*"
+  ],
+  "legacyWatch": true,
+  "verbose": true
+}
