@@ -15,19 +15,22 @@ const path = require('path');
 const mysql = require('mysql2/promise');
 const { migrate } = require('./migrate');
 
-// Tabelle dei dati, svuotate con --reset (i dati di riferimento roles/product_units restano)
+// Tabelle dei dati, svuotate con --reset (i dati di riferimento roles/product_units restano).
+// Vanno elencate anche le tabelle figlie dei cicli: TRUNCATE con i vincoli disattivati
+// non applica ON DELETE CASCADE, e le righe rimaste punterebbero ai cicli ricreati.
 const DATA_TABLES = [
+    'cycle_events', 'producer_cycle_supply',
     'notifications', 'notification_templates', 'magic_links', 'wallet_transactions',
     'order_items', 'orders', 'producer_cycle_validations', 'cycles', 'holidays', 'gas_holidays',
     'products', 'product_categories', 'producers', 'gas_memberships', 'user_permissions',
     'users', 'gas', 'leads', 'page_views'
 ];
 
-const run = async () => {
-    require('dotenv').config();
-    const name = process.argv[2] || 'demo';
-    const reset = process.argv.includes('--reset');
-
+/**
+ * Carica un seed. Usato dalla riga di comando e dai test (backend/test).
+ * @param {{ name?: string, reset?: boolean, log?: Function }} options
+ */
+const loadSeed = async ({ name = 'demo', reset = false, log = console.log } = {}) => {
     if (process.env.NODE_ENV === 'production' || process.env.APP_ENV === 'prod') {
         throw new Error('Seed rifiutato: ambiente di produzione.');
     }
@@ -35,7 +38,7 @@ const run = async () => {
     if (!fs.existsSync(file)) throw new Error(`Seed non trovato: ${file}`);
 
     // Lo schema deve essere aggiornato prima di caricare i dati
-    await migrate();
+    await migrate({ log });
 
     const conn = await mysql.createConnection({
         host: process.env.DB_HOST || 'localhost',
@@ -51,16 +54,29 @@ const run = async () => {
             throw new Error(`Il database contiene già ${n} GAS. Usa --reset per svuotarlo (solo sviluppo).`);
         }
         await conn.query('SET FOREIGN_KEY_CHECKS = 0');
+        // Svuotamento e caricamento in un'unica transazione: un solo commit invece di
+        // uno per istruzione, e in caso di errore il database resta com'era
+        await conn.beginTransaction();
         if (reset) {
-            for (const t of DATA_TABLES) await conn.query(`TRUNCATE TABLE \`${t}\``);
-            console.log('[SEED] Tabelle dei dati svuotate.');
+            // DELETE e non TRUNCATE: su tabelle piccole è molto più veloce (i test lo eseguono a ogni prova)
+            for (const t of DATA_TABLES) await conn.query(`DELETE FROM \`${t}\``);
+            log('[SEED] Tabelle dei dati svuotate.');
         }
         await conn.query(fs.readFileSync(file, 'utf8'));
+        await conn.commit();
         await conn.query('SET FOREIGN_KEY_CHECKS = 1');
-        console.log(`[SEED] ✅ Dati "${name}" caricati.`);
+        log(`[SEED] ✅ Dati "${name}" caricati.`);
     } finally {
         await conn.end();
     }
 };
 
-run().then(() => process.exit(0)).catch(e => { console.error('[SEED] ❌', e.message); process.exit(1); });
+module.exports = { loadSeed, DATA_TABLES };
+
+// Esecuzione da riga di comando
+if (require.main === module) {
+    require('dotenv').config();
+    loadSeed({ name: process.argv[2] || 'demo', reset: process.argv.includes('--reset') })
+        .then(() => process.exit(0))
+        .catch(e => { console.error('[SEED] ❌', e.message); process.exit(1); });
+}

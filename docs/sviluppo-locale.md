@@ -91,7 +91,35 @@ docker compose exec gashub-db mysql -u root -p"$DB_ROOT_PASSWORD" doligas
 ```
 Il codice di `backend/` e `frontend/` è montato dentro i container, quindi le modifiche ai
 file si vedono subito senza ricostruire. Serve `--build` solo quando cambiano le dipendenze
-(`package.json`) o i `Dockerfile`.
+(`package.json`) o i `Dockerfile`, e in quel caso aggiungi `-V`: i `node_modules` stanno in
+un volume anonimo che altrimenti resterebbe quello vecchio, senza le dipendenze nuove.
+```
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build -V gashub-api
+```
+
+## Test automatici
+
+I test del backend (`backend/test/`, Jest + supertest) girano contro un MySQL vero, su un
+database a parte, `doligas_test`, che viene creato al primo avvio con la password di root
+del `.env`. Ogni file di test svuota quel database e ricarica il seed demo, quindi i dati
+di sviluppo in `doligas` non vengono toccati. Per sicurezza i test si rifiutano di partire
+se il nome del database non finisce con `_test`.
+```
+docker compose exec gashub-api npm test                         # tutti
+docker compose exec gashub-api npx jest test/order.test.js      # un file, con i log
+```
+Cosa coprono: accesso con OTP e contesto GAS, ordine con addebito immediato e modifiche,
+credito e GAS "di fiducia", stock, listino e validazione per ciclo, conferma della fornitura,
+pesatura con ripartizione, consegna con conguaglio e coerenza fra saldo e movimenti,
+ricarica del socio, scheduler G1-G7.
+
+Per scrivere un test nuovo parti da `backend/test/helpers.js`: `resetDb()` ricarica i dati,
+`as(USERS.giulia)` fa le richieste autenticate come quell'utente, `setPhase('chiuso')`
+sposta il ciclo in corso in una fase (`listini`, `mercato`, `chiuso`), `sql()` legge e
+scrive direttamente nel database.
+
+Su GitHub gli stessi test girano a ogni push e pull request (`.github/workflows/ci.yml`),
+insieme alla build del frontend.
 
 ## Ripartire da zero
 ```
