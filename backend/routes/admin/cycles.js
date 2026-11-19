@@ -38,16 +38,28 @@ const getDb = () => global.pool || require('../../config/db');
 router.use(verifyGasMembership('Coordinatore'));
 
 // --- DATE HELPERS ---
+/**
+ * Formats a date as 'YYYY-MM-DD HH:MM:SS' in the server's local time (TZ).
+ * Cycle dates are stored as wall-clock time of the GAS, so toISOString() must not
+ * be used here: it converts to UTC and would shift every repeated cycle.
+ */
+const pad = (n) => String(n).padStart(2, '0');
+const formatLocal = (d) =>
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
+    `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+
+// setDate/setMonth work on local time, so repetitions keep the same wall-clock
+// time even across a daylight saving change
 const addDays = (dateStr, days) => {
     const d = new Date(dateStr);
     d.setDate(d.getDate() + days);
-    return d.toISOString().slice(0, 19).replace('T', ' ');
+    return formatLocal(d);
 };
 
 const addMonths = (dateStr, months) => {
     const d = new Date(dateStr);
     d.setMonth(d.getMonth() + months);
-    return d.toISOString().slice(0, 19).replace('T', ' ');
+    return formatLocal(d);
 };
 
 /**
@@ -183,6 +195,27 @@ router.post('/', async (req, res) => {
     }
 });
 
+// --- 6. UPDATE OFFSET SCHEMA ---
+// Must stay BEFORE PUT /:id: Express matches routes in order, and '/:id' would
+// otherwise catch '/schema' as a cycle id.
+router.put('/schema', async (req, res) => {
+    const { g1, g2, g3, g4, g5, g6, g7 } = req.body;
+    const pool = getDb();
+    try {
+        await pool.execute(`
+            UPDATE gas SET 
+                g1_avvio_offset=?, g2_listini_fornitori_offset=?, 
+                g3_apertura_ordini_soci_offset=?, g4_chiusura_ordini_soci_offset=?, 
+                g5_invio_ordini_fornitori_offset=?, g6_conferma_fornitori_offset=?, 
+                g7_consegna_checkout_offset=? 
+            WHERE id=?`, [g1, g2, g3, g4, g5, g6, g7, req.user.verifiedGasId]);
+        res.json({ success: true });
+    } catch (e) { 
+        console.error("[CYCLES] Update Schema Error:", e);
+        res.status(500).json({ error: "Errore aggiornamento schema" }); 
+    }
+});
+
 /**
  * PUT /api/admin/cycles/:id
  * Edits an existing cycle: name and the seven dates. Repetition does not apply
@@ -304,25 +337,6 @@ router.delete('/:id', async (req, res) => {
         await pool.execute("DELETE FROM cycles WHERE id = ? AND gas_id = ?", [req.params.id, req.user.verifiedGasId]);
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: "Errore eliminazione ciclo" }); }
-});
-
-// --- 6. UPDATE OFFSET SCHEMA ---
-router.put('/schema', async (req, res) => {
-    const { g1, g2, g3, g4, g5, g6, g7 } = req.body;
-    const pool = getDb();
-    try {
-        await pool.execute(`
-            UPDATE gas SET 
-                g1_avvio_offset=?, g2_listini_fornitori_offset=?, 
-                g3_apertura_ordini_soci_offset=?, g4_chiusura_ordini_soci_offset=?, 
-                g5_invio_ordini_fornitori_offset=?, g6_conferma_fornitori_offset=?, 
-                g7_consegna_checkout_offset=? 
-            WHERE id=?`, [g1, g2, g3, g4, g5, g6, g7, req.user.verifiedGasId]);
-        res.json({ success: true });
-    } catch (e) { 
-        console.error("[CYCLES] Update Schema Error:", e);
-        res.status(500).json({ error: "Errore aggiornamento schema" }); 
-    }
 });
 
 // --- 7. UPDATE ACTIVE STATUS ---

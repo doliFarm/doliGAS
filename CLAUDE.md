@@ -73,6 +73,7 @@ In locale i container si avviano con `docker compose -f docker-compose.yml -f do
 - In compose `NODE_ENV` prende il valore di `APP_ENV` (`dev`/`prod`), quindi `NODE_ENV === 'development'` non è mai vero nei container.
 - `global.pool` viene usato ovunque tramite `getDb()`. Per le query usa `pool.execute` con parametri `?`, mai concatenazione.
 - Le date del DB sono stringhe (`dateStrings: true`); i confronti temporali vanno fatti preferibilmente in SQL con `NOW()`.
+- **Fuso orario:** le date dei cicli sono salvate come ora locale del GAS. Database e API girano con lo stesso `TZ` (`APP_TZ`, predefinito `Europe/Rome`, in compose e in CI): se i due orologi divergono, le fasi slittano di ore. Per formattare una data da salvare non usare `toISOString()`, che converte in UTC. Un test (`test/cycles.test.js`) controlla che `NOW()` e `new Date()` coincidano.
 - Le operazioni sul wallet vanno sempre in transazione: aggiornano `gas_memberships.balance` e inseriscono una riga in `wallet_transactions`.
 - Non committare `.env` né `mysql-data/` (già esclusi in `.gitignore`); `.env.example` elenca tutte le variabili.
 - **Migrazioni:** mai modificare un file già applicato (il checksum viene confrontato e la differenza segnalata); aggiungere sempre un nuovo file col numero successivo. In MySQL il DDL non è transazionale, quindi tenere ogni migrazione piccola.
