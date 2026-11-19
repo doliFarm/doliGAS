@@ -25,7 +25,7 @@ I numeri #n rimandano ai problemi elencati in `analisi-codice.md`.
 
 Si lavora sul branch `stabilizzazione`, con una pull request aperta verso `main`. Nessuna di queste modifiche è ancora in produzione sulla demo.
 
-> **Dove siamo al 19/11/2026:** Fasi 0, 1 e 2 unite in `main` (PR #1, #3, #4). Sulla demo è rilasciato fino alla PR #3: **la Fase 2 non è ancora in produzione**, e il suo rilascio richiede la sequenza con lo scheduler spento descritta in `CLAUDE.md`. Resta aperta la gestione dello stock, poi la Fase 3.
+> **Dove siamo al 19/11/2026:** Fasi 0, 1 e 2 unite in `main` (PR #1, #3, #4). Sulla demo è rilasciato fino alla PR #3: **la Fase 2 non è ancora in produzione**, e il suo rilascio richiede la sequenza con lo scheduler spento descritta in `CLAUDE.md`. Lo stock (#15) è fatto sul ramo `stock`; poi la Fase 3.
 
 ## Fase 0 — Messa in sicurezza ✅ rilasciata sulla demo
 **Sul server demo (a carico di Luigi):**
@@ -60,7 +60,7 @@ Si lavora sul branch `stabilizzazione`, con una pull request aperta verso `main`
 - ✅ Avvisi del mercato a Soci e Coordinatori, non ai Produttori.
 - ✅ Rotazione dei log nel compose (10 MB × 3 file per servizio).
 - ✅ **Endpoint mancanti** (#11–13): `PUT /api/admin/cycles/:id` con validazione della sequenza delle sette date (applicata anche alla creazione) e normalizzazione del formato `datetime-local`; `ordered_qty` nella lista del produttore, che rendeva vuota la pagina Ordini; `POST /api/products/confirm-supply`, separato dal listino perché la conferma avviene quando il listino è bloccato; import CSV `validate` + `bulk-import` con rivalidazione server-side (`docs/import-csv-catalogo.md`); richiesta di ricarica del socio con avviso al coordinatore.
-- ⏭ **Resta da fare:** gestione dello stock (#15), che oggi non viene né controllato né scalato.
+- ✅ **Stock** (#15, ramo `stock`): `products.stock` è il tetto del listino per ciclo (NULL = illimitato) e **non viene mai scalato**. All'ordine il disponibile si calcola come stock meno quanto hanno già ordinato gli altri soci nel ciclo, con un lock sulla riga del prodotto e la transazione in READ COMMITTED: due soci non possono prendere insieme l'ultima unità. Se il socio chiede troppo, l'ordine viene rifiutato con `409 STOCK_INSUFFICIENTE` e il dettaglio del disponibile, senza addebiti. Il socio può sempre confermare o ridurre la quantità che aveva già, anche se lo stock è stato abbassato dopo. La fornitura confermata dal produttore dopo G4 non sovrascrive più lo stock: sta nella nuova tabella `producer_cycle_supply` (migrazione `004`).
 
 ## Fase 3 — Qualità e manutenibilità
 - Test automatici (Jest + supertest su un DB MySQL di test) del flusso completo: ciclo, listino, validazione, ordine, pesatura, consegna, saldo.

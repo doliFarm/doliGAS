@@ -58,8 +58,8 @@ Il piano completo è in `docs/piano-stabilizzazione.md`; l'analisi dei problemi 
 
 Fase 0 (sicurezza), Fase 1 (migrazioni) e Fase 2 (ciclo G1–G7 ed endpoint mancanti) sono fatte. Resta:
 
-1. **Stock** (#15): non viene né controllato quando il socio ordina, né scalato. È l'ultimo pezzo della Fase 2.
-2. **Fase 3, qualità:** test automatici (Jest + supertest su un MySQL di test) del flusso completo — ciclo, listino, validazione, ordine, pesatura, consegna, saldo; validazione degli input con schemi; pulizia del codice morto (`routes/contact.js`, `routes/admin/dashboard.js`, `routes/admin/products.js` non sono montati; mock nel frontend); proxy Vite che punta a `gashub-backend` invece di `gashub-api`; CI minima. Da allineare anche le traduzioni: `it.json` ha 492 chiavi, `en.json` e `fr.json` 435.
+1. **Stock** (#15): fatto sul ramo `stock` (migrazione `004`), da unire con una PR e rilasciare insieme alla Fase 2.
+2. **Fase 3, qualità:** test automatici (Jest + supertest su un MySQL di test) del flusso completo — ciclo, listino, validazione, ordine, pesatura, consegna, saldo; validazione degli input con schemi; pulizia del codice morto (`routes/contact.js`, `routes/admin/dashboard.js`, `routes/admin/products.js` non sono montati; mock nel frontend); proxy Vite che punta a `gashub-backend` invece di `gashub-api`; CI minima. Da allineare anche le traduzioni: a `en.json` e `fr.json` mancano 57 chiavi di `it.json`.
 3. **Fase 4, connettore Dolibarr opzionale:** campi `external_ref` e `external_source`; per il produttore il suo Dolibarr (listino in entrata, ordini G5 come ordini cliente), per il GAS il proprio Dolibarr (fornitori, ordini fornitore, fatture ai soci); sincronizzazione asincrona con una tabella outbox.
 
 ### Decisioni in sospeso
@@ -83,9 +83,10 @@ In locale i container si avviano con `docker compose -f docker-compose.yml -f do
 - Non committare `.env` né `mysql-data/` (già esclusi in `.gitignore`); `.env.example` elenca tutte le variabili.
 - **Migrazioni:** mai modificare un file già applicato (il checksum viene confrontato e la differenza segnalata); aggiungere sempre un nuovo file col numero successivo. In MySQL il DDL non è transazionale, quindi tenere ogni migrazione piccola.
 - **Accesso senza SMTP:** la demo e l'ambiente locale non inviano email, quindi il codice di accesso torna nella risposta di login e il frontend lo mostra nella console di debug in basso a destra. Serve `DEMO_SHOW_OTP=true` nel `.env`, e per vedere la console serve `APP_ENV=dev`. Con quell'opzione attiva chiunque conosca un indirizzo email può entrare come quella persona: va spenta appena c'è SMTP, e non va mai usata su un'installazione reale.
-- **Traduzioni:** `it.json` ha 492 chiavi, `en.json` e `fr.json` 435: a inglese e francese ne mancano 57, da allineare (Fase 3).
+- **Traduzioni:** a `en.json` e `fr.json` mancano 57 chiavi presenti in `it.json`, da allineare (Fase 3). Le chiavi nuove vanno aggiunte in tutte e tre le lingue.
 - **Scheduler:** gli eventi inviati sono in `cycle_events`. Per far ripartire una notifica basta togliere la sua riga; spostando in avanti una data del ciclo, `PUT /api/admin/cycles/:id` lo fa da solo.
 - **Due endpoint distinti per il produttore:** `PUT /api/products/bulk` modifica il listino e si blocca dopo G2; `POST /api/products/confirm-supply` conferma le quantità da consegnare e vale solo fra chiusura del mercato e consegna. Non confonderli.
+- **Stock:** `products.stock` è il tetto del listino e non viene mai scalato. Il disponibile si calcola (stock meno quanto hanno ordinato gli altri soci nel ciclo) sia in `GET /members/shop` (`available`) sia in `POST /members/order`: se cambi uno dei due, cambia anche l'altro. La fornitura confermata dal produttore dopo G4 sta in `producer_cycle_supply`, non in `products.stock`.
 - La ripartizione della pesatura usa `utils/allocation.js` (metodo dei resti maggiori): la somma delle quote è esattamente il totale ricevuto e le unità discrete restano numeri interi.
 
 ## Convenzioni
