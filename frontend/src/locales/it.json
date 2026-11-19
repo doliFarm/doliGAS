@@ -1,4 +1,8 @@
 {
+  "demo_popup": {
+    "title": "Benvenuto nella versione Demo di doliGAS!",
+    "message": "<b>Cos'è</b>: Questa è un'istanza dimostrativa.\n\n<b>Cosa aspettarsi:</b> Alcune funzionalità  (es. pagamenti, messaggistica, foto catalogo prodotti, import/export dati, etc) sono disattivate.Le performance potrebbero essere degradate.\n\n<b>Aiutaci a crescere:</b> Ogni tuo feedback per noi conta. Hai domande o suggerimenti? Contattaci a info@dolifarm.com.",    "btn_continue": "Ho capito, continua"
+  },
   "common": {
     "save": "Salva",
     "save_changes": "Salva Modifiche",
