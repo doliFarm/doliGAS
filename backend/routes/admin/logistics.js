@@ -15,6 +15,7 @@ const router = express.Router();
  * Helper per acquisire il pool di connessioni singleton.
  */
 const getDb = () => global.pool || require('../../config/db');
+const { allocateProportionally } = require('../../utils/allocation');
 
 // =============================================================================
 // SEZIONE G6: RICEZIONE E PESATURA (CHECK-IN)
@@ -73,34 +74,42 @@ router.post('/checkin/bulk-update', async (req, res) => {
         for (const update of items) {
             const { productId, totalReceived } = update;
 
-            // Recupera tutti gli item per quel prodotto in quel ciclo
+            const received = Number(totalReceived);
+            if (!Number.isFinite(received) || received < 0) {
+                throw new Error(`QUANTITA_NON_VALIDA: peso ricevuto non valido per il prodotto ID ${productId}`);
+            }
+
+            // Recupera tutti gli item per quel prodotto in quel ciclo, più l'unità di misura
             const [itemsToUpdate] = await conn.execute(`
-                SELECT oi.id, oi.quantity, oi.price_at_order, o.user_id
+                SELECT oi.id, oi.quantity, oi.price_at_order, o.user_id, pu.is_discrete
                 FROM order_items oi
                 JOIN orders o ON oi.order_id = o.id
+                JOIN products p ON oi.product_id = p.id
+                JOIN product_units pu ON p.unit_id = pu.id
                 WHERE o.cycle_id = ? AND oi.product_id = ? AND o.gas_id = ?
                   AND o.status IN ('confirmed', 'processing')
+                ORDER BY oi.id ASC
             `, [cycleId, productId, gasId]);
 
             if (itemsToUpdate.length === 0) continue;
 
-            const totalOrdered = itemsToUpdate.reduce((sum, i) => sum + parseFloat(i.quantity), 0);
-            let distributedSoFar = 0;
+            /**
+             * Ripartizione proporzionale con il metodo dei resti maggiori: la somma delle
+             * quote è esattamente il totale ricevuto, senza frazioni perse per arrotondamento.
+             * Le unità discrete (pezzi, bottiglie) sono ripartite in numeri interi.
+             */
+            const step = itemsToUpdate[0].is_discrete ? 1 : 0.01;
+            const assignments = allocateProportionally(
+                received,
+                itemsToUpdate.map(i => parseFloat(i.quantity)),
+                step
+            );
 
             for (let i = 0; i < itemsToUpdate.length; i++) {
-                const item = itemsToUpdate[i];
-                let assigned;
-
-                // Gestione resto sull'ultimo elemento per evitare errori di arrotondamento
-                if (i === itemsToUpdate.length - 1) {
-                    assigned = totalReceived - distributedSoFar;
-                } else {
-                    assigned = totalOrdered > 0 ? (item.quantity / totalOrdered) * totalReceived : 0;
-                }
-                distributedSoFar += assigned;
-
-                // Aggiornamento item
-                await conn.execute("UPDATE order_items SET qty_received = ? WHERE id = ?", [assigned, item.id]);
+                await conn.execute(
+                    "UPDATE order_items SET qty_received = ?, updated_at = NOW(), updated_by = ? WHERE id = ?",
+                    [assignments[i], adminId, itemsToUpdate[i].id]
+                );
             }
         }
 
@@ -109,7 +118,8 @@ router.post('/checkin/bulk-update', async (req, res) => {
     } catch (e) {
         await conn.rollback();
         console.error("[LOGISTICS] Bulk Update Error:", e.message);
-        res.status(500).json({ error: "Errore durante il ricalcolo pesi: " + e.message });
+        const isBusiness = e.message.startsWith('QUANTITA_NON_VALIDA');
+        res.status(isBusiness ? 400 : 500).json({ error: isBusiness ? e.message : "Errore durante il ricalcolo pesi: " + e.message });
     } finally {
         conn.release();
     }
@@ -196,7 +206,7 @@ router.post('/checkout/deliver', async (req, res) => {
         await conn.beginTransaction();
 
         // 1. Recupero dati ordine e item per ricalcolo finale
-        const [orderRows] = await conn.execute("SELECT user_id, status FROM orders WHERE id = ? AND gas_id = ? FOR UPDATE", [orderId, gasId]);
+        const [orderRows] = await conn.execute("SELECT user_id, status, total_amount FROM orders WHERE id = ? AND gas_id = ? FOR UPDATE", [orderId, gasId]);
         if (orderRows.length === 0) throw new Error("Ordine non trovato.");
         if (orderRows[0].status === 'delivered') throw new Error("Ordine già consegnato.");
         if (!['confirmed', 'processing'].includes(orderRows[0].status)) throw new Error("Ordine non consegnabile nello stato attuale.");

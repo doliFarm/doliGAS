@@ -90,23 +90,37 @@ app.use((err, req, res, next) => {
 });
 
 // 5. Avvio Server con Retry Logic (Self-Healing)
+const { migrate } = require('./db/migrate');
+
 const startServer = async () => {
+    // 5a. Attesa del database (il container MySQL può essere più lento a partire)
     let retries = 5;
-    while (retries > 0) {
+    while (true) {
         try {
             await pool.query('SELECT 1');
-            app.listen(PORT, '0.0.0.0', () => {
-                console.log(`🚀 Backend doliGAS online su porta ${PORT}`);
-                console.log(`🌍 CORS abilitato per: ${allowedOrigins.join(', ')}`);
-            });
-            return; 
+            break;
         } catch (err) {
             retries -= 1;
             console.error(`❌ DB Offline. Tentativi rimasti: ${retries}. Errore: ${err.message}`);
+            if (retries <= 0) process.exit(1);
             await new Promise(res => setTimeout(res, 5000));
         }
     }
-    process.exit(1);
+
+    // 5b. Migrazioni dello schema (disattivabili con DB_AUTO_MIGRATE=false)
+    if (process.env.DB_AUTO_MIGRATE !== 'false') {
+        try {
+            await migrate();
+        } catch (err) {
+            console.error('[MIGRATE] ❌ Avvio interrotto:', err.message);
+            process.exit(1);
+        }
+    }
+
+    app.listen(PORT, '0.0.0.0', () => {
+        console.log(`🚀 Backend doliGAS online su porta ${PORT}`);
+        console.log(`🌍 CORS abilitato per: ${allowedOrigins.join(', ')}`);
+    });
 };
 
 startServer();
