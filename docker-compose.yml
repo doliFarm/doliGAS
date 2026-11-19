@@ -61,6 +61,8 @@ services:
       DB_AUTO_MIGRATE: ${DB_AUTO_MIGRATE:-true}
       PORT: ${API_PORT}
       JWT_SECRET: ${JWT_SECRET}
+      ENABLE_DEBUG_API: ${ENABLE_DEBUG_API:-false}
+      DEMO_SHOW_OTP: ${DEMO_SHOW_OTP:-false}
       NODE_ENV: ${APP_ENV}
       APP_ENV: ${APP_ENV}
     depends_on:

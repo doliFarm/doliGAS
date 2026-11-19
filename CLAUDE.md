@@ -5,6 +5,7 @@ Questo file viene letto automaticamente da Claude Code (CLI) all'avvio. Tienilo 
 ## Il progetto
 doliGAS è una web app multi-tenant per i Gruppi di Acquisto Solidale (GAS), con tre profili: **Coordinatore**, **Produttore** e **Socio**.
 - **Indirizzo strategico:** doliGAS è una **piattaforma indipendente**. L'integrazione con Dolibarr/doliFarm (il modulo PHP in `../dolifarm`) è **opzionale**: si attiva solo per i GAS più complessi o per i produttori che la chiedono. Il nucleo non deve mai dipendere da Dolibarr.
+- **Flusso di lavoro:** si sviluppa in locale sulla workstation (Docker, `APP_ENV=dev`), si valida sulla VPS demo, e il passaggio avviene via GitHub con pull request. Niente modifiche a mano sul server. Istruzioni in `docs/sviluppo-locale.md`.
 - **Installazione attiva:** https://demo.dolifarm365.com, sul server `www` in `~/doliGAS`.
 - **Attenzione:** il server è una copia del repository con cui si lavora anche a mano. È già capitato che contenesse un commit non pubblicato (`e11eb59`, modifiche al compose e al ProfileSelector). Prima di ogni aggiornamento, controllare là `git status` e `git log origin/main..main`, e pubblicare l'eventuale lavoro locale su un ramo prima di fare `pull`.
 - **Repository:** https://github.com/doliFarm/doliGAS (branch `main`). `origin/main` (commit `d5fcaae`, aprile 2026) coincide con il codice della demo.
@@ -59,6 +60,8 @@ Il piano completo è in `docs/piano-stabilizzazione.md`; l'analisi dei problemi 
 - `npm run seed:demo` carica i dati demo (rifiuta in produzione e su un database già popolato; `-- --reset` svuota prima).
 - `npm run create-gas -- --name "GAS X" --slug x --admin-email a@b.c --admin-first A --admin-last B` crea un nuovo GAS con il suo coordinatore.
 
+In locale i container si avviano con `docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build` (il secondo file pubblica le porte, che il file principale non apre perché sulla VPS c'è un reverse proxy).
+
 ## Insidie note
 - **Fine riga:** nel repository i file sono salvati con LF, nella cartella di lavoro su Windows con CRLF (`core.autocrlf=true` in questo repo). Non convertire i file a mano.
 - In compose `NODE_ENV` prende il valore di `APP_ENV` (`dev`/`prod`), quindi `NODE_ENV === 'development'` non è mai vero nei container.
@@ -67,6 +70,7 @@ Il piano completo è in `docs/piano-stabilizzazione.md`; l'analisi dei problemi 
 - Le operazioni sul wallet vanno sempre in transazione: aggiornano `gas_memberships.balance` e inseriscono una riga in `wallet_transactions`.
 - Non committare `.env` né `mysql-data/` (già esclusi in `.gitignore`); `.env.example` elenca tutte le variabili.
 - **Migrazioni:** mai modificare un file già applicato (il checksum viene confrontato e la differenza segnalata); aggiungere sempre un nuovo file col numero successivo. In MySQL il DDL non è transazionale, quindi tenere ogni migrazione piccola.
+- **Accesso senza SMTP:** la demo e l'ambiente locale non inviano email, quindi il codice di accesso torna nella risposta di login e il frontend lo mostra nella console di debug in basso a destra. Serve `DEMO_SHOW_OTP=true` nel `.env`, e per vedere la console serve `APP_ENV=dev`. Con quell'opzione attiva chiunque conosca un indirizzo email può entrare come quella persona: va spenta appena c'è SMTP, e non va mai usata su un'installazione reale.
 - **Traduzioni:** `it.json` ha 492 chiavi, `en.json` e `fr.json` 435: a inglese e francese ne mancano 57, da allineare (Fase 3).
 - La ripartizione della pesatura usa `utils/allocation.js` (metodo dei resti maggiori): la somma delle quote è esattamente il totale ricevuto e le unità discrete restano numeri interi.
 
