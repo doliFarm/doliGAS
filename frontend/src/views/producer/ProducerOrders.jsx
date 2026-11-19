@@ -69,7 +69,11 @@ export const ProducerOrders = () => {
     });
 
     try {
-      await axios.put('/api/products/bulk', { items: updates });
+      // Endpoint dedicato: la conferma della fornitura avviene dopo la chiusura del
+      // mercato, quando il listino è bloccato, quindi non passa da /api/products/bulk
+      await axios.post('/api/products/confirm-supply', {
+        items: updates.map(u => ({ id: u.id, qty: u.stock }))
+      });
       setToast({ type: 'success', message: 'Fornitura confermata!' });
       await fetchData(); // Ricarica per vedere i dati aggiornati dal server
     } catch (err) {

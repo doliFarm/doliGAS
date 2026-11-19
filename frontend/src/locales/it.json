@@ -356,7 +356,13 @@
     "how_to_topup": "Come ricaricare il conto?",
     "topup_desc": "Effettua un bonifico al conto del GAS o consegna contanti al coordinatore. La ricarica verrà accreditata manualmente dopo la verifica.",
     "iban_label": "Coordinate Bancarie (Esempio)",
-    "iban_note": "Indica il tuo Nome e Cognome nella causale."
+    "iban_note": "Indica il tuo Nome e Cognome nella causale.",
+    "topup_declare_title": "Hai già versato?",
+    "topup_declare_desc": "Comunica l'importo al coordinatore: il saldo si aggiorna quando lui conferma di averlo ricevuto.",
+    "topup_declare_btn": "Comunica la ricarica",
+    "topup_note_placeholder": "Nota (es. bonifico del 12/03)",
+    "topup_sent": "Richiesta inviata al coordinatore.",
+    "topup_pending": "Hai già una ricarica in attesa di approvazione:"
   },
   "producer_dash": {
     "status_LIST_OPEN": "Richiesta Listino",

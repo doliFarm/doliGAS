@@ -18,6 +18,10 @@ I numeri #n rimandano ai problemi elencati in `analisi-codice.md`.
 | `1c8b764` | Consegna G7 con conguaglio, niente doppio addebito (#7, #8) |
 | `da5a393`, `6a5f671` | Contesto per Claude Code (`CLAUDE.md`) e documenti in `docs/` |
 | `0f9e446` | Fase 1: migrazioni, seed demo, creazione GAS, ripartizione pesatura (#10) |
+| `fcc8ad3` | Merge PR #3: integrazione del lavoro fatto a mano sulla demo, avviso demo dietro `VITE_DEMO_MODE`, `DEMO_SHOW_OTP`, sviluppo locale |
+| `4f6b6bf` | Fase 2: scheduler G1–G7, MOQ, rotazione log |
+| `2fbfbdd` | Fase 2: modifica ciclo, ordini del produttore, conferma fornitura |
+| `fdfb3f3` | Fase 2: import CSV del catalogo, richiesta di ricarica del socio |
 
 Si lavora sul branch `stabilizzazione`, con una pull request aperta verso `main`. Nessuna di queste modifiche è ancora in produzione sulla demo.
 
@@ -47,12 +51,14 @@ Si lavora sul branch `stabilizzazione`, con una pull request aperta verso `main`
 - **Verificato** su MySQL 8: installazione da zero, database preesistente portato alla 002, e strutture finali identiche nei due casi.
 - **Deciso dopo:** le tabelle `permissions`, `role_permissions`, `user_permissions` e `gas_holidays` restano nello schema ma non sono usate dal codice. Da valorizzare o rimuovere con una migrazione.
 
-## Fase 2 — Ciclo G1–G7 completo e coerente
-- ✅ Consegna con conguaglio (#7, #8).
-- ✅ Ripartizione della pesatura con il metodo dei resti maggiori (`utils/allocation.js`): la somma assegnata è esattamente il peso ricevuto e le unità discrete restano interi.
-- Scheduler: avviarlo e renderlo idempotente con una tabella degli eventi già inviati per ciclo (#9); correggere lo stato usato per il MOQ.
-- Endpoint mancanti: modifica ciclo, import CSV del catalogo, ordini del produttore (lista di preparazione), richiesta di ricarica del socio (#11–13).
-- Stock (#15).
+## Fase 2 — Ciclo G1–G7 completo e coerente ✅ fatta
+- ✅ Consegna con conguaglio (#7, #8) e ripartizione della pesatura col metodo dei resti maggiori (`utils/allocation.js`).
+- ✅ **Scheduler** avviato in `server.js` e reso ripetibile: migrazione `003`, con la tabella `cycle_events` e la chiave unica `(cycle_id, event_key)`. L'evento è registrato prima dell'invio, quindi riavvii e processi paralleli non duplicano le notifiche; la condizione è "la data è passata e l'evento non è partito", così le tappe mancate durante un fermo vengono recuperate. Spegnibile con `SCHEDULER_ENABLED=false` (#9).
+- ✅ **MOQ** corretto: cercava `status='pending'`, che non esiste nell'enum.
+- ✅ Avvisi del mercato a Soci e Coordinatori, non ai Produttori.
+- ✅ Rotazione dei log nel compose (10 MB × 3 file per servizio).
+- ✅ **Endpoint mancanti** (#11–13): `PUT /api/admin/cycles/:id` con validazione della sequenza delle sette date (applicata anche alla creazione) e normalizzazione del formato `datetime-local`; `ordered_qty` nella lista del produttore, che rendeva vuota la pagina Ordini; `POST /api/products/confirm-supply`, separato dal listino perché la conferma avviene quando il listino è bloccato; import CSV `validate` + `bulk-import` con rivalidazione server-side (`docs/import-csv-catalogo.md`); richiesta di ricarica del socio con avviso al coordinatore.
+- ⏭ **Resta da fare:** gestione dello stock (#15), che oggi non viene né controllato né scalato.
 
 ## Fase 3 — Qualità e manutenibilità
 - Test automatici (Jest + supertest su un DB MySQL di test) del flusso completo: ciclo, listino, validazione, ordine, pesatura, consegna, saldo.

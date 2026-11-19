@@ -101,6 +101,7 @@ app.use((err, req, res, next) => {
 
 // 5. Avvio Server con Retry Logic (Self-Healing)
 const { migrate } = require('./db/migrate');
+const runScheduler = require('./cron/scheduler');
 
 const startServer = async () => {
     // 5a. Attesa del database (il container MySQL può essere più lento a partire)
@@ -126,6 +127,9 @@ const startServer = async () => {
             process.exit(1);
         }
     }
+
+    // 5c. Automazione del ciclo G1-G7
+    runScheduler();
 
     app.listen(PORT, '0.0.0.0', () => {
         console.log(`🚀 Backend doliGAS online su porta ${PORT}`);

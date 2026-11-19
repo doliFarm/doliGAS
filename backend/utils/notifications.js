@@ -97,10 +97,12 @@ const notifyAllMembers = async (gasId, eventKey, data) => {
     const { subject, body } = await getCompiledTemplate(gasId, eventKey, data);
 
     try {
+        // Destinatari: chi può fare la spesa, cioè Soci (3) e Coordinatori (1).
+        // I Produttori (2) hanno le loro notifiche: non ricevono gli avvisi del mercato.
         const [users] = await pool.execute(`
             SELECT u.id, u.email FROM users u 
             JOIN gas_memberships gm ON u.id = gm.user_id 
-            WHERE gm.gas_id = ? AND gm.is_active = 1 AND gm.role_id != 1`, 
+            WHERE gm.gas_id = ? AND gm.is_active = 1 AND gm.role_id IN (1, 3)`, 
             [gasId]
         );
 
