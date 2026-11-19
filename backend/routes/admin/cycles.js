@@ -30,6 +30,55 @@ const addMonths = (dateStr, months) => {
     return d.toISOString().slice(0, 19).replace('T', ' ');
 };
 
+/**
+ * Le sette date del ciclo, in ordine obbligatorio.
+ * Il frontend fa già questo controllo, ma il server non può fidarsi del client:
+ * date fuori sequenza manderebbero lo scheduler e la bottega in stati incoerenti.
+ */
+const CYCLE_DATES = [
+    ['start_at', 'G1 avvio'],
+    ['producers_deadline', 'G2 chiusura listini'],
+    ['market_open_at', 'G3 apertura ordini'],
+    ['market_close_at', 'G4 chiusura ordini'],
+    ['orders_sent_at', 'G5 invio ai fornitori'],
+    ['confirmation_at', 'G6 conferma fornitori'],
+    ['delivery_at', 'G7 consegna']
+];
+
+/**
+ * Converte una data nel formato accettato da MySQL ('YYYY-MM-DD HH:MM:SS').
+ * Il frontend usa un campo datetime-local, che manda 'YYYY-MM-DDTHH:MM' senza fuso:
+ * la conversione è testuale di proposito, così l'ora resta quella scritta
+ * dall'utente e non viene spostata da un passaggio attraverso UTC.
+ */
+const toMysqlDateTime = (value) => {
+    if (!value) return null;
+    const s = String(value).trim()
+        .replace('T', ' ')
+        .replace(/\.\d+/, '')      // millisecondi
+        .replace(/Z$/i, '')        // indicatore UTC
+        .replace(/[+-]\d{2}:?\d{2}$/, ''); // scostamento di fuso
+    return /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(s) ? `${s}:00` : s;
+};
+
+/** Restituisce un messaggio d'errore, oppure null se le date sono valide. */
+const validateCycleDates = (body) => {
+    const parsed = [];
+    for (const [field, label] of CYCLE_DATES) {
+        const value = body[field];
+        if (!value) return `Data mancante: ${label}`;
+        const d = new Date(value);
+        if (isNaN(d.getTime())) return `Data non valida: ${label}`;
+        parsed.push({ label, d });
+    }
+    for (let i = 1; i < parsed.length; i++) {
+        if (parsed[i].d < parsed[i - 1].d) {
+            return `Sequenza non valida: ${parsed[i].label} precede ${parsed[i - 1].label}`;
+        }
+    }
+    return null;
+};
+
 // --- 1. RECUPERO SCHEMA OFFSET (G1-G7) ---
 router.get('/schema', async (req, res) => {
     const pool = getDb();
@@ -61,6 +110,11 @@ router.post('/', async (req, res) => {
     } = req.body;
     
     const pool = getDb();
+
+    if (!name || !String(name).trim()) return res.status(400).json({ error: "Il nome del ciclo è obbligatorio" });
+    const datesError = validateCycleDates(req.body);
+    if (datesError) return res.status(400).json({ error: datesError });
+
     const connection = await pool.getConnection();
     try {
         await connection.beginTransaction();
@@ -106,6 +160,64 @@ router.post('/', async (req, res) => {
         res.status(500).json({ error: "Errore creazione cicli" });
     } finally {
         connection.release();
+    }
+});
+
+/**
+ * PUT /api/admin/cycles/:id
+ * Modifica un ciclo esistente: nome e le sette date. La ripetizione non si applica
+ * alla modifica, che riguarda sempre un ciclo solo.
+ */
+router.put('/:id', async (req, res) => {
+    const pool = getDb();
+    const gasId = req.user.verifiedGasId;
+    const { name } = req.body;
+
+    if (!name || !String(name).trim()) return res.status(400).json({ error: "Il nome del ciclo è obbligatorio" });
+    const datesError = validateCycleDates(req.body);
+    if (datesError) return res.status(400).json({ error: datesError });
+
+    try {
+        const [existing] = await pool.execute(
+            "SELECT id FROM cycles WHERE id = ? AND gas_id = ?",
+            [req.params.id, gasId]
+        );
+        if (existing.length === 0) return res.status(404).json({ error: "Ciclo non trovato" });
+
+        await pool.execute(`
+            UPDATE cycles SET
+                name = ?, start_at = ?, producers_deadline = ?, market_open_at = ?,
+                market_close_at = ?, orders_sent_at = ?, confirmation_at = ?, delivery_at = ?,
+                updated_at = NOW(), updated_by = ?
+            WHERE id = ? AND gas_id = ?`,
+            [
+                String(name).trim(),
+                ...CYCLE_DATES.map(([field]) => toMysqlDateTime(req.body[field])),
+                req.user.id, req.params.id, gasId
+            ]
+        );
+
+        /**
+         * Spostare una data in avanti rimette in gioco una tappa già notificata:
+         * togliamo dal registro gli eventi la cui data è tornata nel futuro, così
+         * lo scheduler li invierà di nuovo al momento giusto.
+         */
+        await pool.execute(`
+            DELETE ce FROM cycle_events ce
+            JOIN cycles c ON c.id = ce.cycle_id
+            WHERE ce.cycle_id = ?
+              AND (
+                   (ce.event_key = 'G1_OPEN'       AND c.start_at > NOW())
+                OR (ce.event_key = 'G2_DEADLINE'   AND c.producers_deadline > NOW())
+                OR (ce.event_key = 'G3_SHOP_OPEN'  AND c.market_open_at > NOW())
+                OR (ce.event_key IN ('G4_REMINDER','G4_CLOSE') AND c.market_close_at > NOW())
+                OR (ce.event_key = 'G5_PROD_ORDER' AND c.orders_sent_at > NOW())
+              )`, [req.params.id]);
+
+        res.json({ success: true });
+    } catch (e) {
+        console.error("[CYCLES] Update Error:", e.message);
+        res.status(500).json({ error: "Errore aggiornamento ciclo" });
     }
 });
 

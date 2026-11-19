@@ -195,13 +195,25 @@ router.get('/', async (req, res) => {
             }
         }
 
-        // 2. RECUPERO PRODOTTI (Tua query originale)
+        /**
+         * 2. RECUPERO PRODOTTI con la quantità ordinata dai soci nel ciclo corrente.
+         * ordered_qty serve alla pagina "Ordini" del produttore (lista di preparazione):
+         * somma le quantità degli ordini confermati, senza contare quelli annullati o le bozze.
+         */
         const [products] = await pool.execute(`
-            SELECT p.*, u.symbol as unit, c.name as category_name
+            SELECT p.*, u.symbol as unit, c.name as category_name,
+                COALESCE((
+                    SELECT SUM(oi.quantity)
+                    FROM order_items oi
+                    JOIN orders o ON o.id = oi.order_id
+                    WHERE oi.product_id = p.id
+                      AND o.cycle_id = ?
+                      AND o.status IN ('confirmed', 'processing', 'delivered')
+                ), 0) AS ordered_qty
             FROM products p
             JOIN product_units u ON p.unit_id = u.id
             LEFT JOIN product_categories c ON p.category_id = c.id
-            WHERE p.producer_id = ? ORDER BY p.name ASC`, [context.producer_id]);
+            WHERE p.producer_id = ? ORDER BY p.name ASC`, [cycleId || 0, context.producer_id]);
 
         const [units] = await pool.execute("SELECT id, name, symbol FROM product_units ORDER BY name");
         const [categories] = await pool.execute("SELECT id, name FROM product_categories WHERE gas_id = ?", [context.gas_id]);
@@ -212,6 +224,7 @@ router.get('/', async (req, res) => {
             units, 
             categories, 
             isListLocked, // Per retrocompatibilità con isListOpen
+            isLocked: isListLocked, // Nome usato dalla pagina Ordini del produttore
             cycleId,      // Necessario per il tasto Valida
             isValidated,  // Necessario per lo stato del tasto
             validatedAt   // Opzionale, per info UI
@@ -380,6 +393,70 @@ router.get('/profile', async (req, res) => {
     } catch (err) { res.status(500).json({ error: "Errore profilo" }); }
 });
 
+
+/**
+ * POST /api/products/confirm-supply
+ * Il produttore conferma quanto consegnerà davvero di ogni prodotto, dopo la chiusura
+ * del mercato (G4) e prima della consegna (G7).
+ *
+ * È un endpoint separato da PUT /bulk di proposito: quello modifica il LISTINO e resta
+ * bloccato dopo la scadenza G2, mentre questa conferma avviene proprio in quella finestra.
+ *
+ * La quantità confermata viene scritta in products.stock, che in questo flusso significa
+ * "quanto il produttore mette a disposizione per il ciclo in corso".
+ */
+router.post('/confirm-supply', async (req, res) => {
+    const pool = getDb();
+    const { producerId, items } = req.body;
+
+    if (!Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ error: "Nessuna quantità da confermare." });
+    }
+
+    try {
+        const context = await getContext(req.user.id, producerId);
+        if (!context) return res.status(403).json({ error: "Contesto produttore non valido" });
+
+        // La conferma è possibile solo tra la chiusura del mercato e la consegna
+        const [cycles] = await pool.execute(`
+            SELECT id, name FROM cycles
+            WHERE gas_id = ? AND is_active = 1
+              AND market_close_at <= NOW() AND delivery_at > NOW()
+            ORDER BY delivery_at ASC LIMIT 1`, [context.gas_id]);
+
+        if (cycles.length === 0) {
+            return res.status(423).json({ error: "FUORI_FINESTRA: la conferma della fornitura è possibile solo dopo la chiusura del mercato e prima della consegna." });
+        }
+
+        const conn = await pool.getConnection();
+        try {
+            await conn.beginTransaction();
+            let updated = 0;
+            for (const item of items) {
+                const qty = Number(item.qty);
+                if (!Number.isFinite(qty) || qty < 0) {
+                    throw new Error(`QUANTITA_NON_VALIDA: prodotto ID ${item.id}`);
+                }
+                const [r] = await conn.execute(
+                    "UPDATE products SET stock = ?, updated_at = NOW(), updated_by = ? WHERE id = ? AND producer_id = ?",
+                    [qty, req.user.id, item.id, context.producer_id]
+                );
+                updated += r.affectedRows;
+            }
+            await conn.commit();
+            res.json({ success: true, updated, cycleId: cycles[0].id });
+        } catch (e) {
+            await conn.rollback();
+            throw e;
+        } finally {
+            conn.release();
+        }
+    } catch (err) {
+        const isBusiness = /^QUANTITA_NON_VALIDA/.test(err.message);
+        console.error("[PROD_SUPPLY] Error:", err.message);
+        res.status(isBusiness ? 400 : 500).json({ error: isBusiness ? err.message : "Errore durante la conferma della fornitura." });
+    }
+});
 
 /**
  * POST /api/products/validate-list
