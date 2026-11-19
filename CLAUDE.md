@@ -69,6 +69,7 @@ Fase 0 (sicurezza), Fase 1 (migrazioni) e Fase 2 (ciclo G1–G7 ed endpoint manc
 
 ## Comandi utili (in `backend/`)
 - `npm run migrate` applica le migrazioni mancanti; `npm run migrate:status` mostra lo stato senza modificare nulla.
+- `npm test` esegue i test (Jest + supertest) sul database `doligas_test`; nel container: `docker compose exec gashub-api npm test`. Dettagli in `docs/sviluppo-locale.md`.
 - `npm run seed:demo` carica i dati demo (rifiuta in produzione e su un database già popolato; `-- --reset` svuota prima).
 - `npm run create-gas -- --name "GAS X" --slug x --admin-email a@b.c --admin-first A --admin-last B` crea un nuovo GAS con il suo coordinatore.
 
