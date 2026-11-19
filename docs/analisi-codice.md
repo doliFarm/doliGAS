@@ -68,7 +68,7 @@ Il coordinatore crea cicli singoli o ripetuti (settimanali, quindicinali o mensi
 12. La pagina "Ordini" del produttore non ha un backend: legge `/api/products` cercando `ordered_qty`, che non esiste.
 13. Il socio non ha modo di richiedere una ricarica (nessun endpoint crea transazioni `pending`).
 14. `public/contact` chiamava `sendEmail({...})` con un oggetto, invece che con argomenti posizionali.
-15. Lo stock dei prodotti non viene mai scalato né controllato.
+15. Lo stock dei prodotti non viene mai scalato né controllato. *(Risolto: disponibile calcolato all'ordine, fornitura confermata in `producer_cycle_supply`.)*
 16. Il proxy di Vite punta a `gashub-backend` invece di `gashub-api`, e l'nginx del frontend non fa da proxy per `/api`.
 17. Codice morto: `routes/contact.js`, `routes/admin/dashboard.js` e `routes/admin/products.js` non sono montati; nel frontend ci sono dei mock; `sendOTPLink` non viene usata.
 

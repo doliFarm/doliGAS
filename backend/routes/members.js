@@ -170,6 +170,14 @@ router.get('/shop', ensureMembership, async (req, res) => {
         const query = `
             SELECT 
                 p.id, p.name, p.price, p.stock, 
+                -- Disponibile per questo socio: stock del listino meno quanto hanno già
+                -- ordinato gli altri nel ciclo (NULL = illimitato). Stesso calcolo di POST /order.
+                CASE WHEN p.stock IS NULL THEN NULL ELSE GREATEST(0, p.stock - COALESCE((
+                    SELECT SUM(oi.quantity) FROM order_items oi
+                    JOIN orders o ON o.id = oi.order_id
+                    WHERE oi.product_id = p.id AND o.cycle_id = ? AND o.user_id <> ?
+                      AND o.status IN ('confirmed', 'processing', 'delivered')
+                ), 0)) END AS available,
                 u.symbol as unit, 
                 pr.business_name as producer,
                 pc.name as category 
@@ -187,7 +195,12 @@ router.get('/shop', ensureMembership, async (req, res) => {
             ORDER BY pc.name ASC, p.name ASC
         `;
 
-        const [products] = await pool.execute(query, [gasId, cycleId]);
+        const [products] = await pool.execute(query, [cycleId, req.user.id, gasId, cycleId]);
+
+        // mysql2 restituisce i DECIMAL come stringhe: il frontend confronta available con dei numeri
+        for (const p of products) {
+            if (p.available !== null) p.available = Number(p.available);
+        }
 
         res.json({ isOpen, cycleId, products });
 
@@ -213,6 +226,10 @@ router.post('/order', ensureMembership, async (req, res) => {
 
     const conn = await pool.getConnection();
     try {
+        // READ COMMITTED (solo per questa transazione): dopo il lock sul prodotto la somma
+        // delle quantità già ordinate deve vedere gli ordini appena confermati dagli altri.
+        // Con REPEATABLE READ leggerebbe la fotografia presa alla prima SELECT.
+        await conn.query("SET TRANSACTION ISOLATION LEVEL READ COMMITTED");
         await conn.beginTransaction();
 
         // SICUREZZA: il ciclo deve appartenere al GAS, essere attivo e avere il mercato aperto
@@ -224,12 +241,19 @@ router.post('/order', ensureMembership, async (req, res) => {
         );
         if (openCycle.length === 0) throw new Error("MERCATO_CHIUSO: il ciclo non è aperto agli ordini.");
 
-        // Validazione quantità (numeri positivi)
+        // Validazione quantità (numeri positivi). Le righe dello stesso prodotto vengono
+        // sommate, e i prodotti ordinati per id: i lock FOR UPDATE sullo stock vengono
+        // presi sempre nello stesso ordine, così due ordini in parallelo non si bloccano a vicenda.
+        const merged = new Map();
         for (const item of items) {
             const q = Number(item.qty);
+            const pid = Number(item.productId);
             if (!Number.isFinite(q) || q <= 0) throw new Error(`QUANTITA_NON_VALIDA: articolo ID ${item.productId}`);
-            item.qty = q;
+            merged.set(pid, (merged.get(pid) || 0) + q);
         }
+        const cartItems = [...merged.entries()]
+            .sort((a, b) => a[0] - b[0])
+            .map(([productId, qty]) => ({ productId, qty }));
 
         // A. Configurazione GAS (Fiducia/Prepagato)
         const [gasConfig] = await conn.execute("SELECT allow_insufficient_balance FROM gas WHERE id = ?", [gasId]);
@@ -238,12 +262,13 @@ router.post('/order', ensureMembership, async (req, res) => {
        // B. Verifica prezzi correnti, disponibilità e VALIDAZIONE LISTINO
         let newTotal = 0;
         const validatedItems = [];
-        
-        for (const item of items) {
-            // Query rinforzata: verifichiamo is_active del prodotto, del produttore 
+        const stockShortages = [];
+
+        for (const item of cartItems) {
+            // Query rinforzata: verifichiamo is_active del prodotto, del produttore
             // e soprattutto la validazione del listino per il ciclo specifico
             const [pRow] = await conn.execute(`
-                SELECT p.price, p.is_active 
+                SELECT p.name, p.price, p.stock, p.is_active
                 FROM products p
                 JOIN producers pr ON p.producer_id = pr.id
                 INNER JOIN producer_cycle_validations v ON p.producer_id = v.producer_id
@@ -260,9 +285,40 @@ router.post('/order', ensureMembership, async (req, res) => {
                 throw new Error(`PRODOTTO_NON_DISPONIBILE: L'articolo ID ${item.productId} non è acquistabile in questo ciclo.`);
             }
             
+            // Stock: products.stock è il tetto del listino per il ciclo (NULL = illimitato).
+            // Non viene mai scalato: il disponibile si calcola sottraendo quanto hanno già
+            // ordinato gli altri soci nel ciclo. L'ordine del socio stesso non si conta,
+            // perché verrà sostituito da questo.
+            if (pRow[0].stock !== null) {
+                // Lock sulla riga del prodotto: due soci non possono prendere insieme l'ultima unità
+                await conn.execute("SELECT id FROM products WHERE id = ? FOR UPDATE", [item.productId]);
+                const [used] = await conn.execute(`
+                    SELECT
+                        COALESCE(SUM(CASE WHEN o.user_id <> ? THEN oi.quantity END), 0) AS others,
+                        COALESCE(SUM(CASE WHEN o.user_id = ? THEN oi.quantity END), 0) AS mine
+                    FROM order_items oi
+                    JOIN orders o ON o.id = oi.order_id
+                    WHERE oi.product_id = ? AND o.cycle_id = ?
+                      AND o.status IN ('confirmed', 'processing', 'delivered')`,
+                    [userId, userId, item.productId, cycleId]
+                );
+                const available = Math.max(0, Number(pRow[0].stock) - Number(used[0].others));
+                // Se lo stock è stato abbassato dopo l'ordine, il socio può comunque confermare
+                // o ridurre la quantità che aveva già: si blocca solo l'aumento oltre il disponibile.
+                if (item.qty > available && item.qty > Number(used[0].mine)) {
+                    stockShortages.push({ productId: item.productId, name: pRow[0].name, requested: item.qty, available });
+                }
+            }
+
             const price = parseFloat(pRow[0].price);
             newTotal += price * item.qty;
             validatedItems.push({ ...item, price });
+        }
+
+        if (stockShortages.length > 0) {
+            const err = new Error("STOCK_INSUFFICIENTE: " + stockShortages.map(s => `${s.name} (disponibili ${s.available})`).join(', '));
+            err.details = stockShortages;
+            throw err;
         }
 
         // C. Recupero situazione attuale (Sia Wallet che eventuale Ordine già esistente)
@@ -332,6 +388,10 @@ router.post('/order', ensureMembership, async (req, res) => {
     } catch (err) {
         if (conn) await conn.rollback();
         const businessErrors = ["INSUFFICIENT_FUNDS", "MERCATO_CHIUSO", "QUANTITA_NON_VALIDA", "PRODOTTO_NON_DISPONIBILE"];
+        if (err.message.startsWith("STOCK_INSUFFICIENTE")) {
+            // 409: la richiesta è valida ma confligge con quanto già ordinato dagli altri
+            return res.status(409).json({ error: "STOCK_INSUFFICIENTE", message: err.message, details: err.details || [] });
+        }
         const status = businessErrors.some(code => err.message.startsWith(code)) ? 400 : 500;
         console.error("[MEMBER_ORDER] Crash:", err.message);
         res.status(status).json({ error: err.message });

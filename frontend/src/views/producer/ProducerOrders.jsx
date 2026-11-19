@@ -40,12 +40,18 @@ export const ProducerOrders = () => {
 
   useEffect(() => { fetchData(); }, []);
 
+  // Quantità proposta per un prodotto: quella già confermata in questo ciclo
+  // (producer_cycle_supply), altrimenti tutto l'ordinato dai soci.
+  // Lo stock del listino non c'entra: è il tetto degli ordini, non la fornitura.
+  const defaultQty = (item) =>
+    (item.confirmed_qty !== null && item.confirmed_qty !== undefined) ? Number(item.confirmed_qty) : Number(item.ordered_qty);
+
   const handleSaveConfirmation = async () => {
     if (isLocked) return;
 
     setSaving(true);
     // Prepariamo gli aggiornamenti
-    // Se un prodotto non è stato toccato, lo "riconfermiamo" con la sua quantità attuale (ordinato o stock se minore)
+    // Se un prodotto non è stato toccato, lo "riconfermiamo" con la sua quantità attuale (conferma salvata o ordinato)
     // Questo serve per dare un segnale esplicito di "Check-in"
     const updates = items.map(item => {
         // Quantità decisa dall'utente (changes) oppure quella calcolata attuale
@@ -53,16 +59,15 @@ export const ProducerOrders = () => {
         
         // Logica Default:
         // Se c'è una modifica esplicita -> usa quella
-        // Se stock esiste ed è < ordinato -> usa stock
-        // Altrimenti -> usa ordinato
+        // Altrimenti -> conferma già salvata per il ciclo, o in mancanza l'ordinato
         let finalQty = userQty !== undefined 
             ? userQty 
-            : (item.stock !== null && item.stock < item.ordered_qty ? item.stock : item.ordered_qty);
+            : defaultQty(item);
 
         return {
             id: item.id,
             price: item.price,
-            stock: finalQty, // Salviamo come stock la quantità che intendiamo consegnare
+            stock: finalQty, // Quantità che intendiamo consegnare (finisce in producer_cycle_supply)
             is_active: 1,
             min_order_qty: item.min_order_qty
         };
@@ -87,7 +92,7 @@ export const ProducerOrders = () => {
   const totalRevenue = items.reduce((acc, item) => {
       let qty = changes[item.id];
       if (qty === undefined) {
-          qty = (item.stock !== null && item.stock < item.ordered_qty) ? item.stock : item.ordered_qty;
+          qty = defaultQty(item);
       }
       return acc + (qty * item.price);
   }, 0);
@@ -146,15 +151,8 @@ export const ProducerOrders = () => {
               // 1. Modifica utente in corso (non ancora salvata)
               displayQty = changes[item.id];
           } else {
-              // 2. Dati dal DB:
-              // Se stock è definito E stock < ordinato, mostriamo stock (abbiamo confermato di meno).
-              // Se stock è definito E stock >= ordinato, mostriamo ordinato (confermiamo tutto).
-              // Se stock è null, mostriamo ordinato (nessun limite impostato).
-              if (item.stock !== null && item.stock < item.ordered_qty) {
-                  displayQty = item.stock;
-              } else {
-                  displayQty = item.ordered_qty;
-              }
+              // 2. Dati dal DB: la conferma già salvata per il ciclo, altrimenti l'ordinato
+              displayQty = defaultQty(item);
           }
 
           // Evidenzia se diverso dall'ordinato
