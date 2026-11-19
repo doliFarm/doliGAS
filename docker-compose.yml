@@ -14,6 +14,7 @@ services:
       MYSQL_PASSWORD: ${DB_PASSWORD}
     volumes:
       - ./mysql-data:/var/lib/mysql
+      # Non contiene più lo schema: le tabelle sono create dalle migrazioni del backend
       - ./mysql-init:/docker-entrypoint-initdb.d
     networks:
       - internal_net
@@ -47,6 +48,8 @@ services:
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ${DB_NAME}
+      # Migrazioni dello schema applicate all'avvio (mettere a false per applicarle a mano)
+      DB_AUTO_MIGRATE: ${DB_AUTO_MIGRATE:-true}
       PORT: ${API_PORT}
       JWT_SECRET: ${JWT_SECRET}
       NODE_ENV: ${APP_ENV}

@@ -22,7 +22,7 @@ router.post('/send', async (req, res) => {
     // Riceviamo target_profile dal frontend (es: 'member' o 'producer')
     const { recipientIds, subject, message, target_profile } = req.body; 
     
-    const gasId = req.user?.verifiedGasId || req.body?.gasId || req.user?.gas_id;
+    const gasId = req.user?.verifiedGasId; // SICUREZZA: solo il gasId verificato
 
     if (!gasId) return res.status(400).json({ error: "Contesto GAS non identificato." });
     if (!recipientIds || !Array.isArray(recipientIds) || recipientIds.length === 0) {

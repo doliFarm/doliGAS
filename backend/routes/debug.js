@@ -6,7 +6,10 @@
 const express = require('express');
 const router = express.Router();
 const os = require('os');
-const { exec } = require('child_process');
+const { authenticateToken } = require('../middlewares/auth');
+
+// SICUREZZA: tutte le rotte di debug richiedono un utente autenticato
+router.use(authenticateToken);
 
 // --- 1. STATISTICHE HARDWARE (RAM/CPU) ---
 router.get('/system-stats', (req, res) => {

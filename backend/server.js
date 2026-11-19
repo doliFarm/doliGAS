@@ -8,6 +8,12 @@ const cors = require('cors');
 const morgan = require('morgan');
 require('dotenv').config();
 
+// SICUREZZA: senza un JWT_SECRET robusto il server non deve partire
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+    console.error('[CRITICAL] JWT_SECRET mancante o troppo corto (minimo 32 caratteri). Avvio interrotto.');
+    process.exit(1);
+}
+
 // 1. Inizializzazione Log Buffer (In-Memory per Debug Console)
 global.logBuffer = [];
 const MAX_LOGS = 100;
@@ -67,7 +73,11 @@ app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/members', memberRoutes);
 app.use('/api/admin', adminRoutes); 
-app.use('/api/debug', debugRoutes);
+// SICUREZZA: la Debug API esiste solo se abilitata esplicitamente (mai in produzione)
+if (process.env.ENABLE_DEBUG_API === 'true' && process.env.NODE_ENV !== 'production') {
+    app.use('/api/debug', debugRoutes);
+    console.warn('[SECURITY] Debug API abilitata: da NON usare su istanze pubbliche.');
+}
 app.use('/api/public', publicRoutes);
 
 // Health Check per Docker/LoadBalancer
@@ -80,23 +90,37 @@ app.use((err, req, res, next) => {
 });
 
 // 5. Avvio Server con Retry Logic (Self-Healing)
+const { migrate } = require('./db/migrate');
+
 const startServer = async () => {
+    // 5a. Attesa del database (il container MySQL può essere più lento a partire)
     let retries = 5;
-    while (retries > 0) {
+    while (true) {
         try {
             await pool.query('SELECT 1');
-            app.listen(PORT, '0.0.0.0', () => {
-                console.log(`🚀 Backend doliGAS online su porta ${PORT}`);
-                console.log(`🌍 CORS abilitato per: ${allowedOrigins.join(', ')}`);
-            });
-            return; 
+            break;
         } catch (err) {
             retries -= 1;
             console.error(`❌ DB Offline. Tentativi rimasti: ${retries}. Errore: ${err.message}`);
+            if (retries <= 0) process.exit(1);
             await new Promise(res => setTimeout(res, 5000));
         }
     }
-    process.exit(1);
+
+    // 5b. Migrazioni dello schema (disattivabili con DB_AUTO_MIGRATE=false)
+    if (process.env.DB_AUTO_MIGRATE !== 'false') {
+        try {
+            await migrate();
+        } catch (err) {
+            console.error('[MIGRATE] ❌ Avvio interrotto:', err.message);
+            process.exit(1);
+        }
+    }
+
+    app.listen(PORT, '0.0.0.0', () => {
+        console.log(`🚀 Backend doliGAS online su porta ${PORT}`);
+        console.log(`🌍 CORS abilitato per: ${allowedOrigins.join(', ')}`);
+    });
 };
 
 startServer();

@@ -35,6 +35,37 @@ const getContext = async (userId, producerId = null) => {
     }
 };
 
+/**
+ * SICUREZZA: il listino è bloccato tra la scadenza G2 (producers_deadline)
+ * e la consegna del ciclo attivo. Fuori da un ciclo il produttore può modificarlo.
+ */
+const isListLocked = async (gasId) => {
+    const pool = getDb();
+    const [cycles] = await pool.execute(`
+        SELECT id FROM cycles
+        WHERE gas_id = ? AND is_active = 1
+          AND producers_deadline <= NOW() AND delivery_at > NOW()
+        LIMIT 1`, [gasId]);
+    return cycles.length > 0;
+};
+
+/**
+ * Restituisce il contesto produttore solo se l'utente può modificare il listino,
+ * altrimenti invia la risposta di errore e restituisce null.
+ */
+const getWritableContext = async (req, res, producerId) => {
+    const context = await getContext(req.user.id, producerId);
+    if (!context) {
+        res.status(403).json({ error: "Contesto produttore non valido" });
+        return null;
+    }
+    if (await isListLocked(context.gas_id)) {
+        res.status(423).json({ error: "LISTINO_BLOCCATO: la scadenza per modificare il listino di questo ciclo è passata." });
+        return null;
+    }
+    return context;
+};
+
 const isListOpen = async (gasId) => {
     const pool = getDb();
     const [cycles] = await pool.execute(`
@@ -218,8 +249,8 @@ router.post('/', async (req, res) => {
     const pool = getDb();
     const { name, category_id, unit_id, price, stock, min_order_qty, is_active, producerId } = req.body;
     try {
-        const context = await getContext(req.user.id, producerId);
-        if (!context) return res.status(403).json({ error: "Contesto non valido" });
+        const context = await getWritableContext(req, res, producerId);
+        if (!context) return;
 
         // 1. Catturiamo il risultato dell'INSERT
         const [result] = await pool.execute(`
@@ -248,7 +279,9 @@ router.put('/bulk', async (req, res) => {
     const { items, producerId } = req.body;
     const conn = await pool.getConnection();
     try {
-        const context = await getContext(req.user.id, producerId);
+        const context = await getWritableContext(req, res, producerId);
+        if (!context) return;
+        if (!Array.isArray(items)) return res.status(400).json({ error: "Formato dati non valido" });
         await conn.beginTransaction();
         
         // 1. Eseguiamo gli aggiornamenti massivi
@@ -286,7 +319,8 @@ router.put('/:id', async (req, res) => {
     const pool = getDb();
     const { name, category_id, unit_id, price, stock, min_order_qty, is_active, producerId } = req.body;
     try {
-        const context = await getContext(req.user.id, producerId);
+        const context = await getWritableContext(req, res, producerId);
+        if (!context) return;
         
         // 1. Aggiornamento
         await pool.execute(`
@@ -315,7 +349,8 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
     const pool = getDb();
     try {
-        const context = await getContext(req.user.id, req.query.producerId);
+        const context = await getWritableContext(req, res, req.query.producerId);
+        if (!context) return;
         
         // 1. Cancellazione
         await pool.execute("DELETE FROM products WHERE id = ? AND producer_id = ?", [req.params.id, context.producer_id]);

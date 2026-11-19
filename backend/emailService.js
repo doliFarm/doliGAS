@@ -83,4 +83,14 @@ const sendOTPLink = async (email, token, gasSlug = 'demo') => {
 
 
 
-module.exports = { sendEmail, sendNotification, sendOTPLink };
+/**
+ * SICUREZZA: neutralizza l'HTML nei testi inseriti dagli utenti prima di metterli in un'email.
+ */
+const escapeHtml = (value) => String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+module.exports = { sendEmail, sendNotification, sendOTPLink, escapeHtml };

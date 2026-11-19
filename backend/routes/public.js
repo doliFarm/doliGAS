@@ -30,22 +30,27 @@ router.post('/contact', async (req, res) => {
         console.log(`[Public] Lead salvato nel DB: ${email}`);
 
         // 2. Invio Notifica Email (Fail-safe: Se fallisce, il processo continua)
-        const emailSubject = `🔔 Nuovo Contatto da ${name}`;
+        // SICUREZZA: i campi del form vengono neutralizzati prima di finire nell'HTML
+        const esc = emailService.escapeHtml;
+        const emailSubject = `🔔 Nuovo Contatto da ${String(name).substring(0, 100)}`;
+        const emailText = `Nome: ${name}\nEmail: ${email}\nLocalità: ${location || 'Non specificata'}\nMessaggio:\n${message}`;
         const emailBody = `
             <h3>Nuovo messaggio dal sito doliGAS</h3>
-            <p><strong>Nome:</strong> ${name}</p>
-            <p><strong>Email:</strong> ${email}</p>
-            <p><strong>Località:</strong> ${location || 'Non specificata'}</p>
+            <p><strong>Nome:</strong> ${esc(name)}</p>
+            <p><strong>Email:</strong> ${esc(email)}</p>
+            <p><strong>Località:</strong> ${esc(location || 'Non specificata')}</p>
             <p><strong>Messaggio:</strong></p>
-            <div style="background: #f4f4f4; padding: 15px; border-radius: 8px;">${message}</div>
+            <div style="background: #f4f4f4; padding: 15px; border-radius: 8px;">${esc(message).replace(/\n/g, '<br>')}</div>
         `;
 
-        // Utilizziamo un metodo generico del servizio email consolidato
-        emailService.sendEmail({
-            to: process.env.EMAIL_ADMIN || email, // Notifica all'admin o fallback
-            subject: emailSubject,
-            html: emailBody
-        }).catch(err => console.warn('[Public] Email notification skipped:', err.message));
+        // La notifica va solo all'amministratore: mai al mittente del form (evita abusi come relay di spam)
+        const adminEmail = process.env.ADMIN_EMAIL || process.env.EMAIL_ADMIN;
+        if (adminEmail) {
+            emailService.sendEmail(adminEmail, emailSubject, emailText, emailBody)
+                .catch(err => console.warn('[Public] Email notification skipped:', err.message));
+        } else {
+            console.warn('[Public] ADMIN_EMAIL non configurato: notifica lead non inviata.');
+        }
 
         res.status(200).json({ 
             success: true, 

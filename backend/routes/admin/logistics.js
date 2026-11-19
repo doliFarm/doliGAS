@@ -15,6 +15,7 @@ const router = express.Router();
  * Helper per acquisire il pool di connessioni singleton.
  */
 const getDb = () => global.pool || require('../../config/db');
+const { allocateProportionally } = require('../../utils/allocation');
 
 // =============================================================================
 // SEZIONE G6: RICEZIONE E PESATURA (CHECK-IN)
@@ -63,7 +64,8 @@ router.get('/checkin/:cycleId', async (req, res) => {
 router.post('/checkin/bulk-update', async (req, res) => {
     const pool = getDb();
     const conn = await pool.getConnection();
-    const { cycleId, items, gasId } = req.body;
+    const { cycleId, items } = req.body;
+    const gasId = req.user.verifiedGasId; // SICUREZZA: mai il gasId del body
     const adminId = req.user.id;
 
     try {
@@ -72,33 +74,42 @@ router.post('/checkin/bulk-update', async (req, res) => {
         for (const update of items) {
             const { productId, totalReceived } = update;
 
-            // Recupera tutti gli item per quel prodotto in quel ciclo
+            const received = Number(totalReceived);
+            if (!Number.isFinite(received) || received < 0) {
+                throw new Error(`QUANTITA_NON_VALIDA: peso ricevuto non valido per il prodotto ID ${productId}`);
+            }
+
+            // Recupera tutti gli item per quel prodotto in quel ciclo, più l'unità di misura
             const [itemsToUpdate] = await conn.execute(`
-                SELECT oi.id, oi.quantity, oi.price_at_order, o.user_id
+                SELECT oi.id, oi.quantity, oi.price_at_order, o.user_id, pu.is_discrete
                 FROM order_items oi
                 JOIN orders o ON oi.order_id = o.id
+                JOIN products p ON oi.product_id = p.id
+                JOIN product_units pu ON p.unit_id = pu.id
                 WHERE o.cycle_id = ? AND oi.product_id = ? AND o.gas_id = ?
+                  AND o.status IN ('confirmed', 'processing')
+                ORDER BY oi.id ASC
             `, [cycleId, productId, gasId]);
 
             if (itemsToUpdate.length === 0) continue;
 
-            const totalOrdered = itemsToUpdate.reduce((sum, i) => sum + parseFloat(i.quantity), 0);
-            let distributedSoFar = 0;
+            /**
+             * Ripartizione proporzionale con il metodo dei resti maggiori: la somma delle
+             * quote è esattamente il totale ricevuto, senza frazioni perse per arrotondamento.
+             * Le unità discrete (pezzi, bottiglie) sono ripartite in numeri interi.
+             */
+            const step = itemsToUpdate[0].is_discrete ? 1 : 0.01;
+            const assignments = allocateProportionally(
+                received,
+                itemsToUpdate.map(i => parseFloat(i.quantity)),
+                step
+            );
 
             for (let i = 0; i < itemsToUpdate.length; i++) {
-                const item = itemsToUpdate[i];
-                let assigned;
-
-                // Gestione resto sull'ultimo elemento per evitare errori di arrotondamento
-                if (i === itemsToUpdate.length - 1) {
-                    assigned = totalReceived - distributedSoFar;
-                } else {
-                    assigned = totalOrdered > 0 ? (item.quantity / totalOrdered) * totalReceived : 0;
-                }
-                distributedSoFar += assigned;
-
-                // Aggiornamento item
-                await conn.execute("UPDATE order_items SET qty_received = ? WHERE id = ?", [assigned, item.id]);
+                await conn.execute(
+                    "UPDATE order_items SET qty_received = ?, updated_at = NOW(), updated_by = ? WHERE id = ?",
+                    [assignments[i], adminId, itemsToUpdate[i].id]
+                );
             }
         }
 
@@ -107,7 +118,8 @@ router.post('/checkin/bulk-update', async (req, res) => {
     } catch (e) {
         await conn.rollback();
         console.error("[LOGISTICS] Bulk Update Error:", e.message);
-        res.status(500).json({ error: "Errore durante il ricalcolo pesi: " + e.message });
+        const isBusiness = e.message.startsWith('QUANTITA_NON_VALIDA');
+        res.status(isBusiness ? 400 : 500).json({ error: isBusiness ? e.message : "Errore durante il ricalcolo pesi: " + e.message });
     } finally {
         conn.release();
     }
@@ -177,49 +189,68 @@ router.get('/receipt/:orderId', async (req, res) => {
 
 /**
  * POST /api/admin/logistics/checkout/deliver
- * Finalizza l'ordine: addebita il wallet e sposta lo stato a 'delivered'.
- * ROBUSTEZZA: Calcolo del totale "al volo" per evitare discrepanze tra DB e interfaccia.
+ * Finalizza l'ordine con il CONGUAGLIO sul peso reale e sposta lo stato a 'delivered'.
+ * Modello wallet: l'importo ordinato è già stato scalato al momento dell'ordine
+ * (routes/members.js). Qui si regola solo la differenza tra totale reale e totale ordinato:
+ *   - differenza > 0 -> addebito aggiuntivo (SPESA)
+ *   - differenza < 0 -> restituzione al socio (REFUND)
  */
 router.post('/checkout/deliver', async (req, res) => {
     const pool = getDb();
     const conn = await pool.getConnection();
-    const { orderId, gasId } = req.body;
+    const { orderId } = req.body;
+    const gasId = req.user.verifiedGasId; // SICUREZZA: mai il gasId del body
     const adminId = req.user.id;
 
     try {
         await conn.beginTransaction();
 
         // 1. Recupero dati ordine e item per ricalcolo finale
-        const [orderRows] = await conn.execute("SELECT user_id, status FROM orders WHERE id = ? AND gas_id = ? FOR UPDATE", [orderId, gasId]);
+        const [orderRows] = await conn.execute("SELECT user_id, status, total_amount FROM orders WHERE id = ? AND gas_id = ? FOR UPDATE", [orderId, gasId]);
         if (orderRows.length === 0) throw new Error("Ordine non trovato.");
         if (orderRows[0].status === 'delivered') throw new Error("Ordine già consegnato.");
+        if (!['confirmed', 'processing'].includes(orderRows[0].status)) throw new Error("Ordine non consegnabile nello stato attuale.");
 
         const [items] = await conn.execute("SELECT qty_received, quantity, price_at_order FROM order_items WHERE order_id = ?", [orderId]);
 
-        const realTotal = items.reduce((sum, it) => {
-            return sum + (parseFloat(it.qty_received ?? it.quantity) * parseFloat(it.price_at_order));
+        // Calcolo in centesimi per evitare errori di arrotondamento
+        const toCents = (v) => Math.round(parseFloat(v) * 100);
+        const realTotalCents = items.reduce((sum, it) => {
+            const qty = parseFloat(it.qty_received ?? it.quantity);
+            return sum + Math.round(qty * parseFloat(it.price_at_order) * 100);
         }, 0);
+        const realTotal = realTotalCents / 100;
+        const chargedTotal = toCents(orderRows[0].total_amount) / 100;
+        const adjustment = (realTotalCents - toCents(orderRows[0].total_amount)) / 100;
 
-        // 2. Addebito Wallet Socio (Audit Ledger)
-        await conn.execute(
-            "UPDATE gas_memberships SET balance = balance - ?, updated_at = NOW() WHERE user_id = ? AND gas_id = ?",
-            [realTotal, orderRows[0].user_id, gasId]
-        );
+        // 2. Conguaglio Wallet Socio (solo la differenza, con traccia nel registro movimenti)
+        if (adjustment !== 0) {
+            await conn.execute(
+                "UPDATE gas_memberships SET balance = balance - ?, updated_at = NOW(), updated_by = ? WHERE user_id = ? AND gas_id = ?",
+                [adjustment, adminId, orderRows[0].user_id, gasId]
+            );
 
-        await conn.execute(`
-            INSERT INTO wallet_history (gas_id, user_id, amount, type, description, created_by, created_by_name)
-            VALUES (?, ?, ?, 'SPESA', ?, ?, ?)
-        `, [gasId, orderRows[0].user_id, -realTotal, `Acquisto Ciclo Logistica - Ordine #${orderId}`, adminId, req.user.name || 'Admin']);
+            const txType = adjustment > 0 ? 'SPESA' : 'REFUND';
+            const description = adjustment > 0
+                ? `Conguaglio consegna Ordine #${orderId}: peso reale superiore all'ordinato`
+                : `Conguaglio consegna Ordine #${orderId}: restituzione per peso reale inferiore`;
+
+            await conn.execute(`
+                INSERT INTO wallet_transactions (gas_id, user_id, amount, type, status, description, created_at, created_by)
+                VALUES (?, ?, ?, ?, 'completed', ?, NOW(), ?)
+            `, [gasId, orderRows[0].user_id, -adjustment, txType, description, adminId]);
+        }
 
         // 3. Aggiornamento stato ordine
-        await conn.execute("UPDATE orders SET status = 'delivered', total_amount = ?, updated_at = NOW() WHERE id = ?", [realTotal, orderId]);
+        await conn.execute("UPDATE orders SET status = 'delivered', total_amount = ?, updated_at = NOW(), updated_by = ? WHERE id = ?", [realTotal, adminId, orderId]);
 
         await conn.commit();
-        res.json({ success: true, finalAmount: realTotal });
+        res.json({ success: true, finalAmount: realTotal, chargedAtOrder: chargedTotal, adjustment });
     } catch (e) {
         await conn.rollback();
         console.error("[LOGISTICS] Delivery Error:", e.message);
-        res.status(500).json({ error: e.message });
+        const isBusiness = /^Ordine /.test(e.message);
+        res.status(isBusiness ? 400 : 500).json({ error: e.message });
     } finally {
         conn.release();
     }
