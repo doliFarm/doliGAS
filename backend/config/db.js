@@ -1,16 +1,34 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
- * doliGAS - Enterprise Resource Planning per Gruppi di Acquisto Solidale
- * Configurazione e Gestione Pool Connessioni Database (MySQL/MariaDB)
+ * doliGAS - Database connection pool configuration (MySQL/MariaDB)
  * -----------------------------------------------------------------------------
- * Questo modulo esporta un'istanza singleton del pool di connessioni.
- * Utilizza 'mysql2/promise' per supportare l'async/await in tutto il backend.
- * * @module config/db
- * @license GNU GPLv3 (o successiva)
+ * This module exports a singleton connection pool.
+ * It uses 'mysql2/promise' to support async/await across the backend.
+ * @module config/db
  */
 
 const mysql = require('mysql2/promise');
 
-// Caricamento variabili d'ambiente (fallback per sicurezza robusta)
+// Load settings from environment variables
 const dbConfig = {
   host: process.env.DB_HOST || 'localhost',
   port: process.env.DB_PORT ? parseInt(process.env.DB_PORT) : 3306,
@@ -18,32 +36,32 @@ const dbConfig = {
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
   waitForConnections: true,
-  connectionLimit: 10, // Bilanciamento ottimale per carichi medi GAS
+  connectionLimit: 10, // Balanced for the typical load of a GAS
   queueLimit: 0,
   enableKeepAlive: true,
   keepAliveInitialDelay: 10000,
-  dateStrings: true // Mantiene le date come stringhe per evitare offset fusi orari non voluti
+  dateStrings: true // Keep dates as strings to avoid unwanted time zone offsets
 };
 
 /**
- * Validazione Robustezza: Verifica presenza credenziali obbligatorie.
- * In produzione, il server deve interrompersi se il DB non è configurato.
+ * Sanity check: required credentials must be present.
+ * In production the server must stop if the database is not configured.
  */
 if (!dbConfig.user || !dbConfig.database) {
   console.error('[CRITICAL] Configurazione Database incompleta nel file .env');
-  // Non usiamo process.exit(1) qui per permettere al server di loggare l'errore,
-  // ma il pool fallirà alla prima query fornendo un errore chiaro.
+  // We do not call process.exit(1) here so that the server can log the error,
+  // but the pool will fail on the first query with a clear error.
 }
 
 /**
- * Creazione del Pool.
- * Il pool viene creato una sola volta all'avvio dell'applicazione.
+ * Pool creation.
+ * The pool is created only once, when the application starts.
  */
 const pool = mysql.createPool(dbConfig);
 
 /**
- * Test di connessione immediato (Self-Healing/Fail-Fast)
- * Verifica che il database sia raggiungibile all'avvio del backend.
+ * Immediate connection test (fail fast)
+ * Checks that the database is reachable when the backend starts.
  */
 pool.getConnection()
   .then(connection => {
@@ -55,15 +73,15 @@ pool.getConnection()
   });
 
 /**
- * Integrità: Iniezione nel contesto globale.
- * Per mantenere la compatibilità con i moduli esistenti che utilizzano global.pool,
- * iniettiamo l'istanza qui, ma incoraggiamo l'importazione diretta del modulo.
+ * Global context injection.
+ * For compatibility with existing modules that use global.pool the instance
+ * is injected here, but importing the module directly is preferred.
  */
 global.pool = pool;
 
 /**
- * Esportazione del pool.
- * Da utilizzare come: const db = require('../config/db');
- * Esempio: const [rows] = await db.query('SELECT...');
+ * Pool export.
+ * Usage: const db = require('../config/db');
+ * Example: const [rows] = await db.query('SELECT...');
  */
 module.exports = pool;

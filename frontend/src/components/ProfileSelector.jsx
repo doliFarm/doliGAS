@@ -1,10 +1,30 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * @file frontend/src/components/ProfileSelector.jsx
  * @version v1.1.0
  * @author Luigi GRILLO @ doliFarm.com
- * @description Identity Gate Component. Permette agli utenti con ruoli/contesti multipli di selezionare il profilo attivo.
- *              Include un popup informativo iniziale per la modalità DEMO ad attivazione singola per sessione.
- * @status Integro, Completo, Robusto.
+ * @description Identity Gate Component. Lets users with several roles/contexts choose the active profile.
+ *              Includes an initial information popup for DEMO mode, shown once per session.
+ * @status Stable
  * @date 2026-06-04
  */
 
@@ -19,27 +39,27 @@ export const ProfileSelector = () => {
   const { profiles, switchProfile, user, logout } = useAuth();
   const { t } = useTranslation();
   
-  // Stato per il controllo di visibilità del popup demo
+  // State controlling the visibility of the demo popup
   const [isDemoModalOpen, setIsDemoModalOpen] = useState(false);
 
   useEffect(() => {
-    // L'avviso riguarda SOLO l'istanza dimostrativa: su un'installazione reale di un GAS
-    // non deve comparire. Si attiva con VITE_DEMO_MODE=true nel .env.
+    // The notice concerns ONLY the demo instance: it must not appear on a real
+    // GAS installation. It is enabled with VITE_DEMO_MODE=true in the .env.
     if (!APP_CONFIG.DEMO_MODE) return;
-    // sessionStorage: mostrato una volta per sessione del browser
+    // sessionStorage: shown once per browser session
     try {
       if (!sessionStorage.getItem('doliGAS_demo_notice_seen')) setIsDemoModalOpen(true);
     } catch (e) {
-      setIsDemoModalOpen(true); // sessionStorage non disponibile: mostra comunque l'avviso
+      setIsDemoModalOpen(true); // sessionStorage not available: show the notice anyway
     }
   }, []);
 
   const handleCloseModal = () => {
     setIsDemoModalOpen(false);
-    // Memorizza lo stato per non riproporlo fino alla chiusura della sessione del browser
+    // Remember the state so it is not shown again until the browser session ends
     try {
       sessionStorage.setItem('doliGAS_demo_notice_seen', 'true');
-    } catch (e) { /* ignorato: l'avviso ricomparirà al prossimo accesso */ }
+    } catch (e) { /* ignored: the notice will show up again at the next login */ }
   };
 
   return (
@@ -91,7 +111,7 @@ export const ProfileSelector = () => {
         </div>
       </div>
 
-      {/* MODALE DI AVVISO DEMO (Attivato all'accesso immediato post-login) */}
+      {/* DEMO NOTICE MODAL (shown right after login) */}
   <Modal 
         isOpen={isDemoModalOpen} 
         onClose={handleCloseModal} 
@@ -102,7 +122,7 @@ export const ProfileSelector = () => {
             <Info size={28} />
           </div>
           
-          {/* CORREZIONE ROBUSTA: dangerouslySetInnerHTML interpreta i tag <b> e whitespace-pre-line mantiene i ritorni a capo \n */}
+          {/* dangerouslySetInnerHTML renders the <b> tags and whitespace-pre-line keeps the \n line breaks */}
           <div 
             className="text-sm text-slate-600 bg-slate-50 border border-slate-100 p-5 rounded-2xl text-left leading-relaxed shadow-inner whitespace-pre-line"
             dangerouslySetInnerHTML={{ __html: t('demo_popup.message') }}

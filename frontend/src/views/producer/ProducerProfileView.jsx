@@ -1,3 +1,23 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * @file frontend/src/views/producer/ProducerProfileView.jsx
  * @version v1.0.0
@@ -52,7 +72,7 @@ export const ProducerProfileView = () => {
   return (
     <div className="space-y-6">
       
-      {/* HEADER AZIENDALE */}
+      {/* COMPANY HEADER */}
       <div className="flex items-center gap-4 bg-amber-50 p-4 rounded-2xl border border-amber-100">
         <div className="w-16 h-16 rounded-full bg-white border-2 border-amber-200 shadow-sm flex items-center justify-center text-amber-600 text-2xl font-black">
           <Building2 size={32}/>
@@ -64,7 +84,7 @@ export const ProducerProfileView = () => {
       </div>
 
       <div className="space-y-4">
-        {/* DATI FINANZIARI & SEDE */}
+        {/* FINANCIAL DATA & ADDRESS */}
         <Card className="p-4 shadow-sm border-slate-100">
           <h2 className="text-sm font-black text-slate-800 mb-3 flex items-center gap-2 uppercase tracking-wide">
             <Building2 size={16} className="text-amber-500"/> Dati Aziendali
@@ -75,7 +95,7 @@ export const ProducerProfileView = () => {
           </div>
         </Card>
 
-        {/* CONTATTO RESPONSABILE */}
+        {/* CONTACT PERSON */}
         <Card className="p-4 shadow-sm border-slate-100">
           <h2 className="text-sm font-black text-slate-800 mb-3 flex items-center gap-2 uppercase tracking-wide">
             <User size={16} className="text-blue-500"/> Referente

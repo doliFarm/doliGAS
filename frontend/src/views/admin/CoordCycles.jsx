@@ -1,11 +1,31 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * @file frontend/src/views/admin/CoordCycles.jsx
  * @version v1.9.0
  * @author Luigi GRILLO @ doliFarm.com
- * @description Cycle Calendar & Management. Handles G1-G7 lifecycle, Market rules, 
+ * @description Cycle Calendar & Management. Handles G1-G7 lifecycle, Market rules,
  * Simulation engine, Repetitions, and Holiday conflict detection.
- * FIX: Header responsivo (bottone non esce), doppia scrollbar rimossa, date confermate in gg/mm/aaaa.
- * STATUS: Integro, Completo, Robusto.
+ * FIX: responsive header (button no longer overflows), double scrollbar removed, dates confirmed as dd/mm/yyyy.
+ * STATUS: Stable.
  * @date 2026-02-28
  */
 
@@ -27,7 +47,7 @@ export const CoordCycles = () => {
   const { activeProfile } = useAuth(); 
   const { t, i18n } = useTranslation();
 
-  // --- 1. STATI DATI ---
+  // --- 1. DATA STATE ---
   const [cycles, setCycles] = useState([]);
   const [holidays, setHolidays] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -36,12 +56,12 @@ export const CoordCycles = () => {
   const [toast, setToast] = useState(null);
   const [gConfig, setGConfig] = useState({ g1: 10, g2: 8, g3: 7, g4: 2, g5: 2, g6: 1, g7: 0 });
   
-  // --- 2. SELEZIONE & CONFIGURAZIONE ---
+  // --- 2. SELECTION & CONFIGURATION ---
   const [selectedIds, setSelectedIds] = useState([]);
   const [isConfigOpen, setIsConfigOpen] = useState(false); 
   const [simDate, setSimDate] = useState(new Date().toISOString().split('T')[0]);
 
-  // --- 3. STATI MODALI ---
+  // --- 3. MODAL STATE ---
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [editingCycle, setEditingCycle] = useState(null);
@@ -59,11 +79,11 @@ export const CoordCycles = () => {
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [conflictsInModal, setConflictsInModal] = useState([]);
 
-  // --- 4. FORMATTAZIONE DATE ---
+  // --- 4. DATE FORMATTING ---
 
   /**
-   * ROBUSTEZZA: Forza la visualizzazione gg/mm/aaaa hh:mm ignorando i bug del locale browser.
-   * Utilizzata per etichette statiche e righe di conferma (Internazionalizzata).
+   * Forces the dd/mm/yyyy hh:mm display, ignoring browser locale bugs.
+   * Used for static labels and confirmation lines (internationalized).
    */
   const formatDT = (date, includeTime = true) => {
       if (!date) return '---';
@@ -74,13 +94,13 @@ export const CoordCycles = () => {
         day: '2-digit', month: '2-digit', year: 'numeric',
         ...(includeTime ? { hour: '2-digit', minute: '2-digit' } : {})
       };
-      // Usa la lingua corrente di i18n, default it-IT
+      // Uses the current i18n language, default it-IT
       return new Intl.DateTimeFormat(i18n.language || 'it-IT', options).format(d);
   };
 
   /**
-   * Converte una data in stringa ISO locale per gli input datetime-local (YYYY-MM-DDTHH:mm).
-   * Risolve il problema dello slittamento orario di .toISOString().
+   * Converts a date to a local ISO string for datetime-local inputs (YYYY-MM-DDTHH:mm).
+   * Avoids the time shift of .toISOString().
    */
   const toLocalISO = (date) => {
     if (!date) return '';
@@ -96,7 +116,7 @@ export const CoordCycles = () => {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   };
 
-  // --- 5. FETCH DATI ---
+  // --- 5. DATA FETCH ---
   const fetchData = async () => {
     if (!activeProfile?.context_id) return;
     setLoading(true);
@@ -121,7 +141,7 @@ export const CoordCycles = () => {
 
   useEffect(() => { fetchData(); }, [activeProfile]);
 
-  // --- 6. LOGICA DI BUSINESS & CALCOLO ---
+  // --- 6. BUSINESS LOGIC & CALCULATION ---
 
   const checkSingleDateConflict = (dateValue) => {
     if (!dateValue) return false;
@@ -179,7 +199,7 @@ export const CoordCycles = () => {
     };
   }, [currentDate]);
 
-  // --- 7. HANDLERS CICLI ---
+  // --- 7. CYCLE HANDLERS ---
 
   const handleSaveForm = async () => {
     if (!validateSequence(formData)) return;
@@ -285,7 +305,7 @@ export const CoordCycles = () => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   };
 
-  // --- 8. HANDLERS FESTIVITÀ & CONFIG SCHEMA ---
+  // --- 8. HOLIDAY & SCHEMA CONFIG HANDLERS ---
   const openHolidayModal = (h = null, date = null) => {
     if (h) {
       setEditingHoliday(h);
@@ -329,7 +349,7 @@ export const CoordCycles = () => {
     } catch { setToast({type:'error', message: t('common.error')}); }
   };
 
-  // --- 9. RENDER COMPONENTI ---
+  // --- 9. COMPONENT RENDERING ---
 
 const getEventsForDay = (day) => {
     if (viewMode !== 'CALENDAR') return [];
@@ -339,9 +359,9 @@ const getEventsForDay = (day) => {
     cycles.forEach(c => {
       const is = (d) => d && new Date(d).toDateString() === target;
       
-      // Definiamo i nomi brevi delle fasi per risparmiare spazio
+      // Short phase names, to save space
       const wrap = (gCode, phaseName, color, icon, helpKey) => ({ 
-        // RISULTATO: "G2: Deadline | Ciclo Ortofrutta"
+        // RESULT: "G2: Deadline | Ciclo Ortofrutta"
         label: `${gCode}: ${phaseName} | ${c.name}`, 
         color, 
         icon, 
@@ -370,9 +390,9 @@ const getEventsForDay = (day) => {
     <div className="max-w-screen-2xl mx-auto pb-24 px-2 sm:px-4 space-y-6 flex flex-col min-h-screen relative font-sans">
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       
-      {/* HEADER RESPONSIVE FIX
-        Aggiunto flex-wrap e gestito flex-1 / w-full in modo da non far sbordare i bottoni
-      */}
+      {/* RESPONSIVE HEADER FIX
+       flex-wrap added and flex-1 / w-full handled so the buttons do not overflow
+     */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-4 bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-100 shrink-0">
         <div className="w-full lg:w-auto">
           <h1 className="text-xl sm:text-2xl font-black text-slate-800 flex items-center gap-2">
@@ -399,7 +419,7 @@ const getEventsForDay = (day) => {
         </div>
       </div>
 
-      {/* --- TOOLBAR DI SIMULAZIONE E CONFIGURAZIONE --- */}
+      {/* --- SIMULATION AND CONFIGURATION TOOLBAR --- */}
       {isConfigOpen && (
         <Card className="p-5 bg-white border-none shadow-xl border border-slate-100 shrink-0 overflow-visible animate-in slide-in-from-top-4 duration-300">
             <div className="flex flex-col xl:flex-row items-stretch gap-8">
@@ -421,13 +441,13 @@ const getEventsForDay = (day) => {
                 const hasErr = getOffsetError(k);
                 const simLabel = getSimulatedDateLabel(k);
                 
-                // Recuperiamo il titolo descrittivo dalle traduzioni (es: "G1 - Apertura Listini")
+                // Read the descriptive title from the translations (e.g. "G1 - Apertura Listini")
                 const tooltipText = t(`admin_cycles.${k}_label`);
 
                 return (
                     <div 
                       key={k} 
-                      title={tooltipText} // <-- Questo fa apparire il titolo al passaggio del mouse
+                      title={tooltipText} // <-- This shows the title on mouse hover
                       className={`relative p-3 border rounded-2xl flex flex-col items-center justify-between text-center group transition-all min-w-[110px] cursor-help ${
                         hasErr ? 'bg-red-50 border-red-200' : 'bg-slate-50/50 border-slate-100 hover:bg-white hover:shadow-md'
                       }`}
@@ -466,7 +486,7 @@ const getEventsForDay = (day) => {
         </Card>
       )}
 
-      {/* AREA PRINCIPALE (LISTA / CALENDARIO) */}
+      {/* MAIN AREA (LIST / CALENDAR) */}
       <Card className={`flex-1 shadow-md bg-white flex flex-col min-h-[500px] overflow-hidden border-none rounded-[2.5rem] ${viewMode === 'HOLIDAYS' ? 'ring-4 ring-orange-100' : ''}`}>
         
         {selectedIds.length > 0 && viewMode === 'LIST' && (
@@ -560,10 +580,10 @@ const getEventsForDay = (day) => {
         )}
       </Card>
 
-      {/* --- MODALE CICLO (CREAZIONE/EDIT) --- */}
+      {/* --- CYCLE MODAL (CREATE/EDIT) --- */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingCycle ? "Gestione Ciclo Esistente" : "Pianificazione Nuovo Ciclo"}>
         
-        {/* FIX DOPPIA SCROLLBAR: rimosso max-h-[85vh] e overflow-y-auto */}
+        {/* DOUBLE SCROLLBAR FIX: removed max-h-[85vh] and overflow-y-auto */}
         <div className="space-y-6 p-1 font-sans">
           
           {conflictsInModal.length > 0 && (<div className="bg-red-50 border border-red-200 p-4 rounded-xl flex gap-3 text-red-800 font-bold text-xs items-center animate-pulse"><AlertTriangle className="text-red-600 shrink-0" /> {t('admin_cycles.conflict_detected')}</div>)}
@@ -571,7 +591,7 @@ const getEventsForDay = (day) => {
           <div className="bg-slate-50 border border-slate-100 p-6 rounded-[2.5rem] space-y-5 shadow-inner">
              <Input label="Titolo del Ciclo" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="text-base font-bold text-indigo-700 bg-white" placeholder="Es: Ciclo Ortofrutta Maggio" />
              
-             {/* LOGICA RIPETIZIONE RECUPERATA E FUNZIONANTE (Originale) */}
+             {/* REPETITION LOGIC RESTORED AND WORKING (original) */}
              {!editingCycle && (
                 <div className="flex flex-col sm:flex-row gap-4 p-5 bg-white/80 backdrop-blur rounded-3xl border border-white shadow-sm">
                    <div className="flex-1">
@@ -605,7 +625,7 @@ const getEventsForDay = (day) => {
                 className={`text-base font-bold tracking-tight rounded-2xl p-4 ${checkSingleDateConflict(formData.delivery_at) ? 'bg-red-50 border-red-500 text-red-600' : 'bg-emerald-50 border-emerald-100 text-emerald-700'}`}
               />
               
-              {/* FIX FORMATO DATA: Mostriamo la conferma in gg/mm/aaaa sotto l'input */}
+              {/* DATE FORMAT FIX: show the confirmation as dd/mm/yyyy below the input */}
               <div className="mt-2 flex items-center gap-2 px-3">
                 <Badge color={checkSingleDateConflict(formData.delivery_at) ? 'red' : 'emerald'} className="font-black text-[10px] uppercase">
                   {formatDT(formData.delivery_at)}
@@ -633,7 +653,7 @@ const getEventsForDay = (day) => {
                       onChange={e => setFormData({...formData, [item.f]: e.target.value})} 
                       className={`text-sm font-bold rounded-xl ${conflict ? 'bg-red-50 border-red-200 text-red-600' : 'bg-slate-50 border-slate-100'}`}
                     />
-                    {/* FIX FORMATO DATA: Conferma formattata per G1-G6 */}
+                    {/* DATE FORMAT FIX: formatted confirmation for G1-G6 */}
                     <p className="text-[9px] font-black text-indigo-600 uppercase tracking-tighter ml-2 bg-indigo-50 inline-block px-2 py-1 rounded-md">
                       {formatDT(formData[item.f])}
                     </p>
@@ -659,7 +679,7 @@ const getEventsForDay = (day) => {
         </div>
       </Modal>
 
-      {/* --- ALTRI MODALI (HELP, ELIMINAZIONE, FESTIVITÀ) --- */}
+      {/* --- OTHER MODALS (HELP, DELETE, HOLIDAYS) --- */}
       <Modal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} title="Glossario Ciclo Operativo">
           <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
             <p className="text-xs text-slate-500 italic leading-relaxed mb-6">Ogni ciclo segue un percorso obbligato di 7 fasi (G1-G7). Gli offset definiscono quanti giorni prima della consegna (G7) deve avvenire ogni evento.</p>

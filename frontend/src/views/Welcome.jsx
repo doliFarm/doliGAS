@@ -1,9 +1,29 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * @file frontend/src/views/Welcome.jsx
  * @version v4.3.0
  * @author Luigi GRILLO @ doliFarm.com
- * @description Landing Page Strategica "Civic Tech".
- * INTEGRAZIONE: Aggiunta logica di invio form contatti a NocoDB/Email.
+ * @description "Civic Tech" landing page.
+ * INTEGRATION: added the contact form submission to NocoDB/Email.
  * @status Stable - Production Ready
  * @date 2026-02-18
  */
@@ -33,33 +53,33 @@ export const Welcome = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [toast, setToast] = useState(null);
   
-  // Showcase State (Carosello)
+  // Showcase state (carousel)
   const [activeTab, setActiveTab] = useState('member');
   const [currentSlide, setCurrentSlide] = useState(0);
 
-  // --- NUOVO STATO PER FORM CONTATTI (FOOTER) ---
+  // --- NEW STATE FOR THE CONTACT FORM (FOOTER) ---
   const [contactData, setContactData] = useState({ name: '', email: '', location: '', message: '' });
   const [isContactLoading, setIsContactLoading] = useState(false);
 
-  // --- LOGICA INTEGRATA: SUBDOMAIN + WP BRIDGE ---
+  // --- INTEGRATED LOGIC: SUBDOMAIN + WP BRIDGE ---
   useEffect(() => {
     const hostname = window.location.hostname;
     const parts = hostname.split('.');
     let detectedGas = '';
     let locked = false;
 
-    // 1. Rilevamento automatico dal Sottodominio
+    // 1. Automatic detection from the subdomain
     if (parts.length > 2 && parts[0] !== 'www' && parts[0] !== 'welcome') {
         detectedGas = parts[0];
         locked = true;
     }
 
-    // 2. Lettura parametri da URL
+    // 2. Read the URL parameters
     const params = new URLSearchParams(window.location.search);
     const gasParam = params.get('gas');
     const contactParam = params.get('contact');
 
-    // 3. Popolamento Stato
+    // 3. Fill the state
     setFormData(prev => ({
         gasSlug: gasParam || detectedGas || prev.gasSlug,
         contact: contactParam || prev.contact
@@ -74,9 +94,9 @@ export const Welcome = () => {
     setCurrentSlide(0); 
   }, [activeTab]);
   
-// --- TRACKING ANONIMO E VELOCE ---
+// --- FAST ANONYMOUS TRACKING ---
   useEffect(() => {
-    // Evitiamo di tracciare le visite se stiamo sviluppando in localhost
+    // Do not track visits while developing on localhost
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
         return;
     }
@@ -84,17 +104,17 @@ export const Welcome = () => {
     const trackVisit = async () => {
       const apiUrl = import.meta.env.VITE_API_URL || '';
       try {
-        // Chiamata in background, nessuna gestione dell'errore bloccante
+        // Background call, no blocking error handling
         await fetch(`${apiUrl}/api/public/track`, { method: 'POST',signal: AbortSignal.timeout(3000) });
       } catch (e) {
         console.debug("Tracking bypass");
-        // Fail silently: se il tracciamento fallisce (es. AdBlocker), non blocchiamo il sito
+        // Fail silently: if tracking fails (e.g. an ad blocker) the site is not blocked
       }
     };
 
     trackVisit();
-  }, []); // L'array vuoto garantisce che scatti solo 1 volta all'apertura della landing
-  // --- HANDLERS LOGIN ---
+  }, []); // The empty array makes it fire only once, when the landing page opens
+  // --- LOGIN HANDLERS ---
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
@@ -118,18 +138,18 @@ export const Welcome = () => {
     }
   };
 
-  // --- HANDLER CONTATTI (API / NOCODB) ---
+  // --- CONTACT HANDLER (API / NOCODB) ---
   const handleContactSubmit = async (e) => {
       e.preventDefault();
       setIsContactLoading(true);
       
-      // Costruiamo l'URL. 
-      // Se siamo su doligas.com, '/api' viene gestito da Nginx che lo gira al backend.
-      // Usiamo una variabile d'ambiente o un path relativo se servito dallo stesso dominio.
+      // Build the URL.
+      // On doligas.com, '/api' is handled by Nginx, which forwards it to the backend.
+      // Use an environment variable or a relative path when served from the same domain.
       const apiUrl = import.meta.env.VITE_API_URL || 'https://doligas.com/api'; 
 
       try {
-        const response = await fetch(`${apiUrl}/public/contact`, { // Nota: /public/contact
+        const response = await fetch(`${apiUrl}/public/contact`, { // Note: /public/contact
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(contactData),
@@ -139,7 +159,7 @@ export const Welcome = () => {
 
         if (response.ok && result.success) {
           setToast({ type: 'success', message: 'Richiesta inviata! Ti risponderemo presto.' });
-          setContactData({ name: '', email: '', message: '' }); // Reset form
+          setContactData({ name: '', email: '', message: '' }); // Reset the form
         } else {
           throw new Error(result.message || 'Errore invio');
         }
@@ -151,7 +171,7 @@ export const Welcome = () => {
       }
   };
 
-  // --- CONFIGURAZIONE SLIDESHOW DINAMICO (MANTENUTA INTEGRALE) ---
+  // --- DYNAMIC SLIDESHOW CONFIGURATION (KEPT IN FULL) ---
   const generateSlides = (roleName, count = 2) => {
     return Array.from({ length: count }, (_, i) => `/img/screenshot_${roleName}_${i + 1}.png`);
   };
@@ -323,10 +343,10 @@ export const Welcome = () => {
       </p>
     </div>
     
-    {/* GRID: Gap ridotto a 3, Padding ridotto a 4 */}
+    {/* GRID: gap reduced to 3, padding reduced to 4 */}
     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 auto-rows-fr">
       
-      {/* 1. doliGAS (Principale) */}
+      {/* 1. doliGAS (main) */}
       <div className="bg-white p-4 rounded-xl border border-emerald-100 shadow-sm hover:shadow-lg hover:border-emerald-500/30 transition-all duration-300 group flex flex-col items-start justify-between h-full">
           <div>
             <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center text-emerald-600 mb-3 group-hover:scale-105 transition-transform">
@@ -375,9 +395,9 @@ export const Welcome = () => {
           </div>
       </div>
 
-       {/* 4. doliAgroPass (ORA NEUTRO) */}
+       {/* 4. doliAgroPass (NOW NEUTRAL) */}
        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-lg hover:bg-white transition-all duration-300 group flex flex-col items-start justify-between h-full relative overflow-hidden">
-          {/* Effetto sfumato verde molto leggero per distinguerlo appena */}
+          {/* Very light green gradient, just to set it apart */}
           <div className="absolute top-0 right-0 w-20 h-20 bg-emerald-500/5 rounded-full blur-xl -mr-5 -mt-5 group-hover:bg-emerald-500/10 transition-colors"></div>
 
           <div className="relative z-10">
@@ -399,7 +419,7 @@ export const Welcome = () => {
   </div>
 </section>
 
-      {/* === TECNOLOGIA CIVICA === */}
+      {/* === CIVIC TECHNOLOGY === */}
       <section className="py-24 bg-slate-900 relative overflow-hidden z-20">
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/circuit-board.png')] opacity-5"></div>
         <div className="max-w-7xl mx-auto px-6 relative z-10">
@@ -478,13 +498,13 @@ export const Welcome = () => {
         </div>
       </section>
 
-      {/* === FOOTER A DUE COLONNE === */}
-     {/* === FOOTER A DUE COLONNE === */}
+      {/* === TWO-COLUMN FOOTER === */}
+     {/* === TWO-COLUMN FOOTER === */}
       <footer id="footer" className="py-20 bg-slate-900 px-6 z-20 relative border-t border-slate-800">
         <div className="max-w-6xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
             
-            {/* COLONNA SINISTRA: VISIONE */}
+            {/* LEFT COLUMN: VISION */}
             <div className="text-left space-y-8">
               <div>
                 
@@ -497,7 +517,7 @@ export const Welcome = () => {
               </div>
 
               <div className="p-8 bg-slate-800/30 rounded-3xl border border-slate-700/50 backdrop-blur-sm relative overflow-hidden group">
-                {/* Effetto luce soffusa al passaggio del mouse */}
+                {/* Soft light effect on mouse hover */}
                 <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                 
                 <h4 className="text-emerald-400 text-xs font-black uppercase tracking-widest mb-3 relative z-10">
@@ -521,10 +541,10 @@ export const Welcome = () => {
               </div>
             </div>
 
-            {/* COLONNA DESTRA: FORM + BADGE PIONIERI */}
+            {/* RIGHT COLUMN: FORM + PIONEERS BADGE */}
             <div className="relative">
               
-              {/* BADGE PIONIERI - Posizionato a cavallo del bordo superiore */}
+              {/* PIONEERS BADGE - placed across the top border */}
               <div className="absolute -top-6 left-8 z-30 transform hover:scale-105 transition-transform duration-300 pointer-events-none sm:pointer-events-auto">
                 <div className="bg-emerald-600 text-white px-5 py-2.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] shadow-[0_10px_30px_rgba(5,150,105,0.4)] flex items-center gap-3 border border-emerald-400/50 backdrop-blur-md">
                   <span className="relative flex h-2 w-2">
@@ -538,10 +558,10 @@ export const Welcome = () => {
               <div className="bg-white/[0.02] p-8 rounded-3xl border border-white/5 shadow-2xl relative backdrop-blur-md">
                 <h4 className="text-xl font-bold text-white mb-2">{t('welcome_page.form_title')}</h4>
                 <form className="space-y-4" onSubmit={handleContactSubmit}>
-                  {/* Aumentato a grid-cols-3 per far spazio ai 3 campi principali (o gestito in due righe) */}
+                  {/* Increased to grid-cols-3 to make room for the 3 main fields (or handled on two rows) */}
                   <div className="grid grid-cols-1 gap-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {/* Campo NOME */}
+                      {/* NAME field */}
                       <input 
                         type="text" 
                         required 
@@ -550,18 +570,18 @@ export const Welcome = () => {
                         onChange={(e) => setContactData({...contactData, name: e.target.value})}
                         className="bg-slate-900 border border-slate-700 rounded-xl p-4 text-white placeholder:text-slate-600 focus:ring-2 focus:ring-emerald-500 outline-none transition-all w-full"
                       />
-                      {/* Campo LOCALITA' */}
+                      {/* LOCATION field */}
                       <input 
                         type="text" 
                         required 
-                        placeholder={t('welcome_page.form_location_placeholder', 'Città o Provincia')} // Ricordati di aggiungere la traduzione
-                        value={contactData.location} // <-- Assicurati che lo stato iniziale contenga location: ''
+                        placeholder={t('welcome_page.form_location_placeholder', 'Città o Provincia')} // Remember to add the translation
+                        value={contactData.location} // <-- Make sure the initial state contains location: ''
                         onChange={(e) => setContactData({...contactData, location: e.target.value})}
                         className="bg-slate-900 border border-slate-700 rounded-xl p-4 text-white placeholder:text-slate-600 focus:ring-2 focus:ring-emerald-500 outline-none transition-all w-full"
                       />
                     </div>
                     
-                    {/* Campo EMAIL (A tutta larghezza sotto nome e località) */}
+                    {/* EMAIL field (full width below name and location) */}
                     <input 
                       type="email" 
                       required 
@@ -572,7 +592,7 @@ export const Welcome = () => {
                     />
                   </div>
                   
-                  {/* Campo MESSAGGIO */}
+                  {/* MESSAGE field */}
                   <textarea 
                     required 
                     placeholder={t('welcome_page.form_message_placeholder')}
@@ -594,7 +614,7 @@ export const Welcome = () => {
                     </label>
                   </div>
 
-                  {/* BOTTONE SUBMIT */}
+                  {/* SUBMIT BUTTON */}
                   <button 
                     type="submit" 
                     disabled={isContactLoading}
@@ -614,7 +634,7 @@ export const Welcome = () => {
             </div>
           </div>
 
-          {/* SEZIONE INFERIORE: DISCLAIMER E COPYRIGHT */}
+          {/* BOTTOM SECTION: DISCLAIMER AND COPYRIGHT */}
           <div className="mt-20 pt-8 border-t border-slate-800 text-center">
             {/*<p className="max-w-2xl mx-auto text-[9px] text-slate-700 leading-relaxed uppercase tracking-[0.2em] mb-6">
               {t('welcome_page.eco_footer')}

@@ -1,9 +1,29 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * @file frontend/src/components/LanguageSelector.jsx
  * @version v1.2.1
  * @author Luigi GRILLO @ doliFarm.com
- * @description Selettore lingua globale. Variante minimal ottimizzata per evitare sigle sdoppiate.
- * STATUS: Integro, Completo, Robusto.
+ * @description Global language selector. Minimal variant designed to avoid duplicated labels.
+ * STATUS: Stable.
  */
 
 import React from 'react';
@@ -26,8 +46,8 @@ export const LanguageSelector = ({ variant = 'default' }) => {
     localStorage.setItem('doliGAS_language', lng);
   };
 
-  // VARIANTE 1: MINIMAL (Navbar Welcome/Login)
-  // Rimossa l'emoji per evitare il "raddoppio" visivo su sistemi senza font emoji
+  // VARIANT 1: MINIMAL (Welcome/Login navbar)
+  // Emoji removed to avoid the visual "double" on systems without emoji fonts
   if (variant === 'minimal') {
     return (
       <div className="flex items-center gap-1 bg-slate-900/50 backdrop-blur-xl rounded-full p-1 border border-white/20 shadow-2xl">
@@ -53,7 +73,7 @@ export const LanguageSelector = ({ variant = 'default' }) => {
     );
   }
 
-  // VARIANTE 2: LIST (Dropdown Menu Utente)
+  // VARIANT 2: LIST (user menu dropdown)
   return (
     <div className="py-1">
       <p className="px-3 py-1.5 text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">

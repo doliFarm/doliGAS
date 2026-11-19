@@ -1,9 +1,29 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * @file frontend/src/ProducerApp.jsx
  * @version v1.1.0
  * @author Luigi GRILLO @ doliFarm.com
  * @description Main Layout for Producers. Updated with User Dropdown improvements (Badge + Legal links).
- * @status Integro, Completo, Robusto.
+ * @status Stable
  * @date 2026-02-24
  */
 
@@ -28,18 +48,18 @@ export const ProducerApp = () => {
   const location = useLocation();
   const { t } = useTranslation();
   
-  // STATI MODALI
+  // MODAL STATE
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   
   const [cycleStatus, setCycleStatus] = useState(null);
   
-  // Stato Menu Dropdown
+  // Dropdown menu state
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
-  // Chiusura menu al click esterno
+  // Close the menu on an outside click
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
@@ -50,7 +70,7 @@ export const ProducerApp = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Carica lo stato del ciclo per i pallini di notifica
+  // Load the cycle status for the notification dots
   useEffect(() => {
     const fetchStatus = async () => {
       if (!activeProfile || activeProfile.type !== 'PRODUCER') return;
@@ -103,10 +123,10 @@ export const ProducerApp = () => {
   return (
     <div className="flex h-screen bg-amber-50/30 overflow-hidden font-sans">
       
-     {/* --- DESKTOP SIDEBAR (Uniformata al nuovo design compatto) --- */}
+     {/* --- DESKTOP SIDEBAR (aligned with the new compact design) --- */}
       <aside className="hidden md:flex flex-col w-72 bg-white border-r border-slate-100 h-[100dvh] z-20">
         
-        {/* HEADER LOGO CON SWITCHER INCORPORATO */}
+        {/* LOGO HEADER WITH BUILT-IN SWITCHER */}
         <div className="px-5 py-4 flex items-center justify-between border-b border-slate-50 shrink-0">
           <div className="flex items-center gap-2.5 overflow-hidden">
             <div className="p-1.5 bg-amber-500 rounded-lg text-white shadow-md shadow-amber-200 shrink-0">
@@ -117,7 +137,7 @@ export const ProducerApp = () => {
                 <span className="font-black text-slate-800 text-lg tracking-tighter italic leading-none">
                   doliGAS
                 </span>
-                {/* Switcher: Aggiunto shrink-0 per evitare che venga compresso */}
+                {/* Switcher: shrink-0 added so it is not squeezed */}
                 {profiles?.length > 1 && (
                   <button 
                     onClick={handleSwitchContext}
@@ -138,7 +158,7 @@ export const ProducerApp = () => {
           </div>
         </div>
 
-        {/* NAVIGAZIONE CONTESTUALE */}
+        {/* CONTEXTUAL NAVIGATION */}
         <nav className="flex-1 px-4 space-y-2 py-4 overflow-y-auto scrollbar-hide">
           {navItems.map((item) => {
             const dotClass = getStatusDot(item.id);
@@ -213,7 +233,7 @@ export const ProducerApp = () => {
                        <div className="p-4 border-b border-slate-50 bg-slate-50/50">
                            <div className="flex items-center justify-between mb-1">
                                <p className="text-sm font-bold text-slate-800">{user?.first_name} {user?.last_name}</p>
-                               {/* BADGE PRODUTTORE RICHIESTO */}
+                               {/* REQUIRED PRODUCER BADGE */}
                                <span className="text-[9px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-black uppercase tracking-tighter border border-amber-200">
                                    Produttore
                                </span>
@@ -221,7 +241,7 @@ export const ProducerApp = () => {
                            <p className="text-xs text-slate-400 truncate">{user?.email}</p>
                        </div>
                        
-                       {/* LINGUA */}
+                       {/* LANGUAGE */}
                        <div className="px-2 pt-2 border-b border-slate-50 pb-2">
                           <LanguageSelector />
                        </div>
@@ -237,7 +257,7 @@ export const ProducerApp = () => {
                                <User size={18}/> Scheda Aziendale
                            </button>
 
-                           {/* VOCI LEGALI (Uniformate al Socio) */}
+                           {/* LEGAL ITEMS (aligned with the Member area) */}
                            <div className="md:hidden border-t border-slate-50 mt-1 pt-1">
                               <button onClick={() => { setIsUserMenuOpen(false); setShowPrivacy(true); }} className="w-full flex items-center gap-3 px-3 py-2 text-sm font-bold text-slate-500 hover:bg-slate-50 rounded-xl transition-colors text-left">
                                   <Shield size={16}/> Privacy Policy
@@ -268,7 +288,7 @@ export const ProducerApp = () => {
             </footer>
         </main>
 
-        {/* --- MOBILE NAV (Aggiornata con Logout) --- */}
+        {/* --- MOBILE NAV (updated with Logout) --- */}
         <nav className="md:hidden fixed bottom-0 left-0 w-full bg-white/95 backdrop-blur-md border-t border-slate-200 pb-safe z-40 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
           <div className="flex justify-around items-center h-16">
             {navItems.map((item) => {
@@ -291,7 +311,7 @@ export const ProducerApp = () => {
                 </NavLink>
               );
             })}
-            {/* Tasto Esci Mobile richiesto per simmetria con Socio */}
+            {/* Mobile Exit button, for symmetry with the Member area */}
             <button onClick={logout} className="flex flex-col items-center justify-center w-full h-full space-y-1 text-slate-400 hover:text-red-500 transition-colors">
               <div className="p-1.5 rounded-xl">
                 <LogOut size={24} strokeWidth={2} />
@@ -302,7 +322,7 @@ export const ProducerApp = () => {
         </nav>
       </div>
 
-      {/* --- MODALI DI SISTEMA --- */}
+      {/* --- SYSTEM MODALS --- */}
       <Modal isOpen={showProfile} onClose={() => setShowProfile(false)} title="Scheda Aziendale">
           <div className="p-6">
             <ProducerProfileView />

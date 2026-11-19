@@ -1,9 +1,29 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * @file frontend/src/views/auth/Login.jsx
  * @version v1.1.0
  * @author Luigi GRILLO @ doliFarm.com
- * @description Login View. Gestione OTP con auto-rilevamento sottodominio e supporto Debug Console.
- * @status Integro, Completo, Robusto.
+ * @description Login View. OTP handling with subdomain auto-detection and Debug Console support.
+ * @status Stable
  * @date 2026-02-23
  */
 
@@ -32,7 +52,7 @@ export const Login = () => {
     const hostname = window.location.hostname;
     const parts = hostname.split('.');
     
-    // Logica Subdomain: se siamo su [slug].dolifarm.com
+    // Subdomain logic: on [slug].dolifarm.com
     if (parts.length > 2 && parts[0] !== 'www' && parts[0] !== 'welcome') {
         setFormData(prev => ({ ...prev, gasSlug: parts[0] }));
         setIsGasLocked(true); 
@@ -45,12 +65,12 @@ export const Login = () => {
     setToast(null);
 
     try {
-      // Chiamata al backend
+      // Backend call
       const res = await requestOtp(formData.contact, formData.gasSlug);
       
       if (res.success) {
-        // --- LOGICA ROBUSTA DEBUG OTP ---
-        // Se il backend ha inviato il codice (solo in DEV), lo "spariamo" alla console di debug
+        // --- DEBUG OTP LOGIC ---
+        // If the backend sent the code (DEV only), push it to the debug console
         if (res.debug_code) {
             window.dispatchEvent(new CustomEvent('doliGAS_debug_otp', { 
                 detail: { 
@@ -64,14 +84,14 @@ export const Login = () => {
 
         setToast({ type: 'success', message: t('auth_login.code_sent') });
         
-        // Navigazione ritardata per permettere la visione del toast
+        // Delayed navigation so the toast can be seen
         setTimeout(() => {
             navigate('/auth/verify', { 
                 state: { contact: formData.contact, gasSlug: formData.gasSlug } 
             });
         }, 1000);
       } else {
-        // Messaggio civetta: non confermiamo se l'utente esiste per sicurezza
+        // Decoy message: for security we do not confirm whether the user exists
         setToast({ type: 'info', message: res.message });
       }
     } catch (err) {

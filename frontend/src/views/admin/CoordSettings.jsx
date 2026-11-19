@@ -1,9 +1,29 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * @file frontend/src/views/admin/CoordSettings.jsx
  * @version v1.2.0
  * @author Luigi GRILLO @ doliFarm.com
- * @description GAS Settings. Gestione anagrafica, categorie, notifiche e nuove modalità operative (Pagamenti, Ordini, Consegne).
- * @status Integro, Completo, Robusto.
+ * @description GAS Settings. Registry, categories, notifications and the new operating modes (payments, orders, deliveries).
+ * @status Stable
  * @date 2026-02-24
  */
 
@@ -35,7 +55,7 @@ export const CoordSettings = () => {
     const [toast, setToast] = useState(null);
     const [activeTab, setActiveTab] = useState('GENERAL');
     
-    // --- STATE DATI ---
+    // --- DATA STATE ---
     const [formData, setFormData] = useState({
         name: '', 
         description: '', 
@@ -43,9 +63,9 @@ export const CoordSettings = () => {
         website: '', 
         email_contact: '', 
         allow_insufficient_balance: false,
-        manage_payments: true,   // Nuova opzione
-        manage_orders: true,     // Nuova opzione
-        manage_deliveries: true  // Nuova opzione
+        manage_payments: true,   // New option
+        manage_orders: true,     // New option
+        manage_deliveries: true  // New option
     });
     const [templates, setTemplates] = useState({});
     const [categories, setCategories] = useState([]);
@@ -134,7 +154,7 @@ export const CoordSettings = () => {
         }
     };
 
-    // Helper per renderizzare i toggle (Chirurgia Modalità Operative)
+    // Helper rendering the toggles (operating modes)
     const RenderToggle = ({ label, sublabel, field }) => (
         <div className="flex items-start justify-between gap-4 p-4 rounded-xl bg-slate-50 border border-slate-100 hover:bg-white transition-all duration-200">
             <div className="min-w-0">
@@ -158,7 +178,7 @@ export const CoordSettings = () => {
         <div className="max-w-5xl mx-auto pb-20 px-4 space-y-6 animate-in fade-in duration-500">
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-            {/* HEADER CON TAB */}
+            {/* HEADER WITH TABS */}
             <div className="bg-white p-4 rounded-3xl shadow-sm border border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4">
                 <div className="flex items-center gap-3">
                     <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600"><Settings size={24} /></div>
@@ -187,7 +207,7 @@ export const CoordSettings = () => {
                             </div>
                         </Card>
 
-                        {/* SEZIONE REGOLE E MODALITA OPERATIVE */}
+                        {/* RULES AND OPERATING MODES SECTION */}
                         <Card className="p-6 border-l-4 border-l-amber-400 bg-white space-y-4">
                             <h2 className="text-xs font-black text-slate-400 uppercase tracking-tighter flex items-center gap-2 mb-4"><ShieldAlert size={14} className="text-amber-500"/> Regole e Modalità Operativa</h2>
                             
@@ -300,7 +320,7 @@ export const CoordSettings = () => {
                 </div>
             )}
 
-            {/* TASTO SALVA GLOBALE */}
+            {/* GLOBAL SAVE BUTTON */}
             {activeTab !== 'CATEGORIES' && (
                 <div className="sticky bottom-6 z-10">
                     <Button onClick={handleSubmit} isLoading={saving} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-2xl font-black shadow-xl uppercase tracking-wide">

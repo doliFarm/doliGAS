@@ -1,4 +1,24 @@
-// Ripartizione della pesatura: test unitari, senza database
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
+// Weighing split: unit tests, no database
 const { allocateProportionally } = require('../utils/allocation');
 
 const sum = (a) => Number(a.reduce((x, y) => x + y, 0).toFixed(6));
@@ -7,7 +27,7 @@ describe('allocateProportionally', () => {
     test('la somma delle quote è esattamente il totale ricevuto', () => {
         const q = allocateProportionally(10, [1, 1, 1], 0.01);
         expect(sum(q)).toBe(10);
-        expect(q).toEqual([3.34, 3.33, 3.33]); // il centesimo in più va al primo a parità di resto
+        expect(q).toEqual([3.34, 3.33, 3.33]); // the extra cent goes to the first one when remainders are equal
     });
 
     test('ripartisce in proporzione all\'ordinato', () => {

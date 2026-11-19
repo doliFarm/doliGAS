@@ -1,9 +1,29 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * @file frontend/src/views/admin/CoordMembers.jsx
  * @version v1.1.0
  * @author Luigi GRILLO @ doliFarm.com
- * @description Gestione Soci e Cassa. Fix: Posizionamento Bulk Bar per compatibilità Mobile Bottom Nav.
- * @status Integro, Completo, Robusto.
+ * @description Members and cash management. Fix: bulk bar position compatible with the mobile bottom nav.
+ * @status Stable
  * @date 2026-02-24
  */
 
@@ -32,7 +52,7 @@ export const CoordMembers = () => {
   const dropdownRef = useRef(null); 
   const { t } = useTranslation();
   
-  // --- STATI DATI ---
+  // --- DATA STATE ---
   const [activeTab, setActiveTab] = useState('MEMBERS');
   const [members, setMembers] = useState([]);
   const [pendingTx, setPendingTx] = useState([]);
@@ -40,20 +60,20 @@ export const CoordMembers = () => {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
   
-  // --- FILTRI & ORDINAMENTO ---
+  // --- FILTERS & SORTING ---
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState('ALL');
   const [selectedIds, setSelectedIds] = useState([]); 
   const [sortConfig, setSortConfig] = useState({ key: 'last_name', direction: 'asc' });
 
-  // --- STATI MODALI ---
+  // --- MODAL STATE ---
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
   const [isMsgModalOpen, setIsMsgModalOpen] = useState(false);
   const [messageTargets, setMessageTargets] = useState([]); 
   const [msgData, setMsgData] = useState({ subject: '', body: '', channels: { email: true, whatsapp: false, board: false } });
 
-  // --- STATI CASSA ---
+  // --- CASH STATE ---
   const [selectedWalletUser, setSelectedWalletUser] = useState(null); 
   const [walletSearchQuery, setWalletSearchQuery] = useState('');
   const [isWalletDropdownOpen, setIsWalletDropdownOpen] = useState(false);
@@ -297,7 +317,7 @@ export const CoordMembers = () => {
             </table>
           </div>
 
-          {/* FIX: BARRA AZIONI MASSIVE MOBILE FRIENDLY */}
+          {/* FIX: MOBILE FRIENDLY BULK ACTIONS BAR */}
           {selectedIds.length > 0 && (
               <div className="fixed bottom-20 lg:bottom-10 left-4 right-4 lg:left-1/2 lg:-translate-x-1/2 lg:w-max bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center justify-between lg:gap-8 z-50 border border-slate-700 animate-in slide-in-from-bottom-10 duration-300">
                   <div className="flex items-center gap-3">
@@ -374,7 +394,7 @@ export const CoordMembers = () => {
           </div>
       )}
 
-      {/* MODALI */}
+      {/* MODALS */}
       {isEditModalOpen && editingMember && (
           <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 backdrop-blur-sm p-4 overflow-y-auto">
               <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl my-auto overflow-hidden">

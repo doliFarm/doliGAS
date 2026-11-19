@@ -1,3 +1,23 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * @file frontend/src/views/member/ShopView.jsx
  * @version v1.0.0
@@ -27,7 +47,7 @@ export const ShopView = () => {
   const [loading, setLoading] = useState(true);
   const [shopData, setShopData] = useState({ isOpen: false, products: [], cycleId: null });
   
-  // STATO CARRELLO: Inizializzato lazy per GAS specifico
+  // CART STATE: lazily initialized for the specific GAS
   const [cart, setCart] = useState({});
   
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -42,7 +62,7 @@ export const ShopView = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
 
-  // --- CARICAMENTO DATI ---
+  // --- DATA LOADING ---
   useEffect(() => {
     const fetchShop = async () => {
       if (!activeProfile?.context_id) return;
@@ -66,7 +86,7 @@ export const ShopView = () => {
     fetchShop();
   }, [activeProfile]);
 
-  // --- SALVATAGGIO CARRELLO ---
+  // --- CART SAVING ---
   useEffect(() => {
     if (activeProfile?.context_id) {
       localStorage.setItem(`doliGAS_cart_${activeProfile.context_id}`, JSON.stringify(cart));
@@ -78,8 +98,8 @@ export const ShopView = () => {
     setCart(prev => {
       const current = prev[productId] || 0;
       const newVal = Math.max(0, current + delta);
-      // Si blocca solo l'aumento oltre il disponibile: ridurre è sempre permesso
-      // (anche quando lo stock è stato abbassato dopo l'ordine)
+      // Only increases beyond availability are blocked: reducing is always allowed
+      // (even when the stock was lowered after the order)
       if (delta > 0 && maxStock !== null && maxStock !== undefined && newVal > maxStock) {
           return prev;
       }
@@ -102,7 +122,7 @@ export const ShopView = () => {
     return { count, total };
   }, [cart, shopData.products]);
 
-  // Logica Sort
+  // Sort logic
   const handleSort = (key) => {
     setSortConfig(prev => ({
       key,
@@ -159,12 +179,12 @@ export const ShopView = () => {
       setIsCartOpen(false);
       setTimeout(() => navigate('/member/dashboard'), 1500);
     } catch (err) { 
-      // GESTIONE ERRORE i18n
+      // i18n ERROR HANDLING
       const errorMsg = err.response?.data?.error;
       if (errorMsg === 'INSUFFICIENT_FUNDS') {
           setToast({ type: 'error', message: t('member_shop.error_insufficient_funds') });
       } else if (errorMsg === 'STOCK_INSUFFICIENTE') {
-          // Qualcun altro ha ordinato nel frattempo: mostriamo cosa è ancora disponibile
+          // Someone else ordered in the meantime: show what is still available
           const details = err.response?.data?.details || [];
           const list = details.map(d => `${d.name}: ${d.available}`).join(', ');
           setToast({ type: 'error', message: t('member_shop.error_stock', { items: list }) });
@@ -182,7 +202,7 @@ export const ShopView = () => {
     <div className="pb-24 relative min-h-full">
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-      {/* HEADER + FILTRI */}
+      {/* HEADER + FILTERS */}
       <div className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur py-2 px-1 space-y-2 mb-4 border-b border-slate-200 shadow-sm">
          {!shopData.isOpen && (
              <div className="bg-orange-100 text-orange-800 px-3 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-2 mb-2 border border-orange-200">
@@ -210,7 +230,7 @@ export const ShopView = () => {
         )}
       </div>
 
-      {/* RENDER PRODOTTI */}
+      {/* PRODUCT RENDERING */}
       {viewMode === 'GRID' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredProducts.map(p => {

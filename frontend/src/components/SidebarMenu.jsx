@@ -1,10 +1,30 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * @file frontend/src/components/SidebarMenu.jsx
  * @version v7.9
  * @author Luigi GRILLO @ doliFarm.com
- * @description Sidebar dinamica contestuale unica per Coordinatore, Socio e Produttore. 
- * FIX: Pulsante Switcher posizionato esattamente accanto al logo, condizionato a profiles > 1.
- * @status Integro, Completo, Robusto.
+ * @description Single contextual sidebar for Coordinator, Member and Producer.
+ * FIX: Switcher button placed right next to the logo, shown only when profiles > 1.
+ * @status Stable
  * @date 2026-02-28
  */
 
@@ -26,12 +46,12 @@ export const SidebarMenu = ({ isOpen, onClose }) => {
   const { user, activeProfile, profiles, logout, switchProfile } = useAuth();
 
   /**
-   * Generazione dinamica del menu basata sul tipo di profilo attivo.
+   * Builds the menu from the type of the active profile.
    */
   const getContextualMenu = () => {
     if (!activeProfile) return [];
 
-    // 1. CONTESTO PRODUTTORE
+    // 1. PRODUCER CONTEXT
     if (activeProfile.type === 'PRODUCER') {
       return [
         { id: 'PRD_DASH', label: t('producer.dashboard', 'Dashboard Azienda'), icon: BarChart3, path: '/producer/dashboard' },
@@ -40,7 +60,7 @@ export const SidebarMenu = ({ isOpen, onClose }) => {
       ];
     }
 
-    // 2. CONTESTO GAS (Admin / Coordinatore del Gruppo)
+    // 2. GAS CONTEXT (Admin / group Coordinator)
     if (activeProfile.type === 'GAS' && activeProfile.role_name === 'Coordinatore') {
       return [
         { id: 'ADM_DASH', label: t('admin_dashboard.title_dashboard'), icon: BarChart3, path: '/admin/dashboard' },
@@ -53,7 +73,7 @@ export const SidebarMenu = ({ isOpen, onClose }) => {
       ];
     }
 
-    // 3. CONTESTO GAS (Socio Ordinante)
+    // 3. GAS CONTEXT (ordering Member)
     if (activeProfile.type === 'GAS' && activeProfile.role_name === 'Socio') {
       return [
         { id: 'MEM_DASH', label: t('member.dashboard', 'Dashboard'), icon: LayoutDashboard, path: '/member/dashboard' },
@@ -67,7 +87,7 @@ export const SidebarMenu = ({ isOpen, onClose }) => {
   };
 
   /**
-   * Identifica l'etichetta dell'area corretta da mostrare nell'Header
+   * Picks the label of the area to show in the header
    */
   const getAreaLabel = () => {
     if (activeProfile?.type === 'PRODUCER') return t('common.producer_area', 'Area Fornitore');
@@ -94,7 +114,7 @@ export const SidebarMenu = ({ isOpen, onClose }) => {
 
   return (
     <>
-      {/* OVERLAY MOBILE */}
+      {/* MOBILE OVERLAY */}
       {isOpen && (
         <div 
           className="fixed inset-0 bg-slate-900/60 z-40 lg:hidden backdrop-blur-sm transition-opacity duration-300" 
@@ -109,7 +129,7 @@ export const SidebarMenu = ({ isOpen, onClose }) => {
         ${isOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         
-        {/* HEADER LOGO CON SWITCHER INCORPORATO E TESTO DINAMICO */}
+        {/* LOGO HEADER WITH BUILT-IN SWITCHER AND DYNAMIC TEXT */}
         <div className="px-5 py-4 flex items-center justify-between border-b border-slate-50 shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="p-1.5 bg-emerald-600 rounded-lg text-white shadow-md shadow-emerald-100 shrink-0">
@@ -117,20 +137,20 @@ export const SidebarMenu = ({ isOpen, onClose }) => {
             </div>
             <div className="flex flex-col">
               
-              {/* RIGA 1: LOGO */}
+              {/* ROW 1: LOGO */}
               <span className="font-black text-slate-800 text-lg tracking-tighter italic leading-none">
                 doliGAS
               </span>
               
-              {/* RIGA 2: ETICHETTA AREA + BOTTONE CAMBIA */}
+              {/* ROW 2: AREA LABEL + SWITCH BUTTON */}
               <div className="flex items-center mt-1.5 gap-2">
                 <span className="text-[8.5px] text-slate-400 font-black uppercase tracking-widest leading-none">
                   {getAreaLabel()}
                 </span>
                 
-                {/* Il bottone è ora forzato ad apparire sempre per aggirare il bug 
-                  di svuotamento della variabile 'profiles' su Socio e Produttore 
-                */}
+                {/* The button is now always shown, to work around the bug
+                 that empties the 'profiles' variable for Member and Producer
+               */}
                 <button 
                   onClick={handleSwitchContext}
                   className="flex items-center gap-1 bg-indigo-50 hover:bg-indigo-500 text-indigo-600 hover:text-white px-1.5 py-0.5 rounded transition-colors group"
@@ -154,7 +174,7 @@ export const SidebarMenu = ({ isOpen, onClose }) => {
           </button>
         </div>
 
-        {/* NAVIGAZIONE CONTESTUALE */}
+        {/* CONTEXTUAL NAVIGATION */}
         <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto scrollbar-hide">
           {menuItems.map((item) => {
             const active = isActive(item.path);

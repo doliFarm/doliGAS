@@ -1,16 +1,36 @@
-/**
- * @file backend/utils/csv.js
- * @description Lettura di file CSV per l'import del catalogo.
- * Nessuna dipendenza esterna: il formato accettato è semplice e definito qui.
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
  *
- * Caratteristiche:
- * - separatore riconosciuto automaticamente fra ';' (quello di Excel in italiano) e ',';
- * - campi fra doppi apici, con "" per un apice letterale;
- * - BOM iniziale ignorato (Excel lo aggiunge salvando in UTF-8);
- * - intestazioni normalizzate (minuscole, senza accenti né spazi).
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-/** Rimuove accenti e spazi dalle intestazioni, così "Unità di misura" diventa "unitadimisura". */
+/**
+ * @file backend/utils/csv.js
+ * @description CSV reader for the catalog import.
+ * No external dependencies: the accepted format is simple and defined here.
+ *
+ * Features:
+ * - separator detected automatically between ';' (Excel with Italian locale) and ',';
+ * - fields in double quotes, with "" for a literal quote;
+ * - leading BOM ignored (Excel adds it when saving as UTF-8);
+ * - normalized headers (lower case, no accents or spaces).
+ */
+
+/** Removes accents and spaces from headers, so "Unità di misura" becomes "unitadimisura". */
 const normalizeHeader = (h) => String(h)
     .replace(/^﻿/, '')
     .trim()
@@ -18,7 +38,7 @@ const normalizeHeader = (h) => String(h)
     .normalize('NFD').replace(/[̀-ͯ]/g, '')
     .replace(/[\s_-]+/g, '');
 
-/** Divide una riga tenendo conto degli apici. */
+/** Splits a line, taking quotes into account. */
 const splitLine = (line, sep) => {
     const out = [];
     let field = '';
@@ -41,22 +61,22 @@ const splitLine = (line, sep) => {
 };
 
 /**
- * @param {string} text contenuto del file
+ * @param {string} text file content
  * @returns {{headers: string[], rows: object[], separator: string}}
- *          rows: un oggetto per riga, con le chiavi normalizzate; `_line` è il numero di riga nel file
+ *          rows: one object per line, with normalized keys; `_line` is the line number in the file
  */
 const parseCsv = (text) => {
     const clean = String(text || '').replace(/^﻿/, '').replace(/\r\n?/g, '\n');
     const lines = clean.split('\n').filter(l => l.trim() !== '');
     if (lines.length === 0) return { headers: [], rows: [], separator: ';' };
 
-    // Separatore: quello più frequente nella riga di intestazione
+    // Separator: the most frequent one in the header line
     const separator = (lines[0].split(';').length >= lines[0].split(',').length) ? ';' : ',';
     const headers = splitLine(lines[0], separator).map(normalizeHeader);
 
     const rows = lines.slice(1).map((line, idx) => {
         const values = splitLine(line, separator);
-        const row = { _line: idx + 2 }; // +2: la riga 1 è l'intestazione
+        const row = { _line: idx + 2 }; // +2: line 1 is the header
         headers.forEach((h, i) => { row[h] = values[i] !== undefined ? values[i] : ''; });
         return row;
     });
@@ -64,14 +84,14 @@ const parseCsv = (text) => {
     return { headers, rows, separator };
 };
 
-/** Legge un numero accettando sia la virgola sia il punto come separatore decimale. */
+/** Reads a number accepting either a comma or a dot as decimal separator. */
 const parseNumber = (value) => {
     if (value === undefined || value === null || String(value).trim() === '') return null;
     const n = Number(String(value).trim().replace(/\s/g, '').replace(',', '.'));
     return Number.isFinite(n) ? n : NaN;
 };
 
-/** Legge un valore vero/falso scritto in vari modi. */
+/** Reads a true/false value written in several ways. */
 const parseBool = (value, fallback = true) => {
     const s = String(value ?? '').trim().toLowerCase();
     if (s === '') return fallback;

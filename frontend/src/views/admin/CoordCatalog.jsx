@@ -1,10 +1,30 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * @file frontend/src/views/admin/CoordCatalog.jsx
  * @version v1.4.5
  * @author Luigi GRILLO @ doliFarm.com
- * @description Catalogo Globale Coordinatore. Gestione articoli, categorie e import CSV. 
- * FIX: Ordinamento colonne (Stock, Min Qty, Stato, Prezzo), rimozione decimali Min Qty.
- * STATUS: Integro, Completo, Robusto.
+ * @description Coordinator global catalog. Products, categories and CSV import.
+ * FIX: column sorting (Stock, Min Qty, Status, Price), no decimals for Min Qty.
+ * STATUS: Stable.
  * @date 2026-02-28
  */
 
@@ -26,7 +46,7 @@ export const CoordCatalog = () => {
     const { activeProfile } = useAuth();
     const { t } = useTranslation();
     
-    // --- STATE DATI ---
+    // --- DATA STATE ---
     const [products, setProducts] = useState([]);
     const [producers, setProducers] = useState([]);
     const [categories, setCategories] = useState([]);
@@ -34,15 +54,15 @@ export const CoordCatalog = () => {
     const [loading, setLoading] = useState(true);
     const [toast, setToast] = useState(null);
 
-    // --- STATE SELEZIONE & BULK ---
+    // --- SELECTION & BULK STATE ---
     const [selectedIds, setSelectedIds] = useState([]);
     const [isBulkOperating, setIsBulkOperating] = useState(false);
 
-    // --- STATE FILTRI & ORDINAMENTO ---
+    // --- FILTER & SORT STATE ---
     const [filters, setFilters] = useState({ name: '', producer: '', category: '', validationStatus: 'all' });
     const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
 
-    // --- STATE MODALI ---
+    // --- MODAL STATE ---
     const [isProductModalOpen, setIsProductModalOpen] = useState(false);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null);
@@ -51,13 +71,13 @@ export const CoordCatalog = () => {
         stock: '', min_order_qty: 1, is_active: true 
     });
     
-    // --- STATE CSV ---
+    // --- CSV STATE ---
     const fileInputRef = useRef(null);
     const [dragActive, setDragActive] = useState(false);
     const [importReport, setImportReport] = useState(null);
     const [importing, setImporting] = useState(false);
 
-    // --- FETCH DATI ---
+    // --- DATA FETCH ---
     const fetchData = async () => {
         if (!activeProfile?.context_id) return;
         setLoading(true);
@@ -87,7 +107,7 @@ export const CoordCatalog = () => {
 
     useEffect(() => { fetchData(); }, [activeProfile]);
 
-    // --- FILTRAGGIO & ORDINAMENTO ROBUSTO ---
+    // --- FILTERING & SORTING ---
     const sortedAndFilteredProducts = useMemo(() => {
         let result = products.filter(p => {
             const matchName = (p.name || '').toLowerCase().includes(filters.name.toLowerCase());
@@ -96,9 +116,9 @@ export const CoordCatalog = () => {
             const isProdValidated = (p.is_validated === 1 || p.is_validated === '1' || p.is_validated === true);
             let matchValidation = true;
             if (filters.validationStatus === 'validated') {
-                matchValidation = isProdValidated; // Mostra solo se true
+                matchValidation = isProdValidated; // Show only if true
             } else if (filters.validationStatus === 'pending') {
-                matchValidation = !isProdValidated; // Mostra solo se false
+                matchValidation = !isProdValidated; // Show only if false
             }
             return matchName && matchProducer && matchCategory && matchValidation;        });
         if (sortConfig.key) {
@@ -106,7 +126,7 @@ export const CoordCatalog = () => {
                 let valA = a[sortConfig.key];
                 let valB = b[sortConfig.key];
 
-                // Gestione specifica per tipi numerici o nulli
+                // Specific handling for numeric or null types
                 if (valA === null || valA === undefined) valA = -1;
                 if (valB === null || valB === undefined) valB = -1;
 
@@ -128,7 +148,7 @@ export const CoordCatalog = () => {
         setSortConfig({ key, direction });
     };
 
-    // --- AZIONI MASSIVE ---
+    // --- BULK ACTIONS ---
     const handleBulkAction = async (action) => {
         if (selectedIds.length === 0) return;
         const gasId = activeProfile.context_id;
@@ -198,7 +218,7 @@ export const CoordCatalog = () => {
                 category_id: formData.category_id ? parseInt(formData.category_id) : null,
                 price: parseFloat(formData.price) || 0,
                 stock: formData.stock === '' ? null : parseFloat(formData.stock), 
-                min_order_qty: parseInt(formData.min_order_qty) || 1, // Garantisce intero
+                min_order_qty: parseInt(formData.min_order_qty) || 1, // Guarantees an integer
                 is_active: formData.is_active ? 1 : 0,
                 gasId: activeProfile.context_id 
             };
@@ -268,10 +288,10 @@ export const CoordCatalog = () => {
                     </Button>
                 </div>
             </div>
-            {/* SEARCH BAR (Ricerca, Filtri e Toggle Validazione Inline) */}
+            {/* SEARCH BAR (search, filters and inline validation toggle) */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-white p-4 rounded-2xl shadow-sm border border-slate-100 shrink-0">
                 
-                {/* 1. Ricerca Prodotto */}
+                {/* 1. Product search */}
                 <Input 
                     placeholder={t('admin_catalog.search_product', 'Cerca prodotto...')}
                     value={filters.name}
@@ -280,7 +300,7 @@ export const CoordCatalog = () => {
                     className="bg-slate-50 border-none h-11"
                 />
 
-                {/* 2. Ricerca Produttore + Toggle Validazione Integrati */}
+                {/* 2. Producer search + integrated validation toggle */}
                 <div className="flex bg-slate-50 rounded-xl border border-transparent focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-200 transition-all h-11 overflow-hidden">
                     <div className="flex items-center pl-3 text-slate-400">
                         <Tractor size={16} />
@@ -310,7 +330,7 @@ export const CoordCatalog = () => {
                     </div>
                 </div>
 
-                {/* 3. Filtro Categoria */}
+                {/* 3. Category filter */}
                 <div className="relative">
                     <Select 
                         value={filters.category}
@@ -326,7 +346,7 @@ export const CoordCatalog = () => {
                 </div>
             </div>
 
-            {/* TABELLA CON ORDINAMENTO ATTIVO */}
+            {/* TABLE WITH ACTIVE SORTING */}
             <Card className="flex-1 shadow-md bg-white border-none relative overflow-visible pb-16">
                 <div className="overflow-x-auto">
                     <table className="w-full text-[11px] sm:text-sm text-left border-collapse">
@@ -346,7 +366,7 @@ export const CoordCatalog = () => {
                                     <div className="flex items-center gap-1">{t('admin_catalog.col_producer')} <ArrowUpDown size={12} className="opacity-40"/></div>
                                 </th>
                                 
-                                {/* COLONNE ORDINABILI AGGIUNTE */}
+                                {/* SORTABLE COLUMNS ADDED */}
                                 <th className="px-4 py-3 hidden xl:table-cell text-center cursor-pointer hover:text-emerald-600" onClick={() => requestSort('stock')}>
                                     <div className="flex items-center justify-center gap-1">Giacenza <ArrowUpDown size={12} className="opacity-40"/></div>
                                 </th>
@@ -421,7 +441,7 @@ export const CoordCatalog = () => {
                     </table>
                 </div>
 
-                {/* BARRA AZIONI MASSIVE */}
+                {/* BULK ACTIONS BAR */}
                 {selectedIds.length > 0 && (
                     <div className="fixed bottom-20 lg:bottom-10 left-4 right-4 lg:left-1/2 lg:-translate-x-1/2 lg:w-max bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center justify-between lg:gap-8 z-50 border border-slate-700 animate-in slide-in-from-bottom-10">
                         <div className="flex items-center gap-3">
@@ -444,7 +464,7 @@ export const CoordCatalog = () => {
                 )}
             </Card>
 
-            {/* MODALE CRUD */}
+            {/* CRUD MODAL */}
             <Modal isOpen={isProductModalOpen} onClose={() => setIsProductModalOpen(false)} title={editingProduct ? t('admin_catalog.modal_edit_title') : t('admin_catalog.modal_new_title')}>
                 <div className="space-y-4">
                     <Input label={t('admin_catalog.field_name')} value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required />
@@ -501,7 +521,7 @@ export const CoordCatalog = () => {
                 </div>
             </Modal>
 
-            {/* MODALE IMPORT CSV */}
+            {/* CSV IMPORT MODAL */}
             <Modal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} title={t('admin_catalog.modal_import_title')}>
                 {!importReport ? (
                     <div className="space-y-6">

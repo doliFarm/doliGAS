@@ -1,3 +1,23 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * @file frontend/src/views/admin/CoordLogistics.jsx
  * @version v1.0.1
@@ -79,9 +99,9 @@ export const CoordLogistics = () => {
   );
 };
 
-// --- RICEZIONE MERCE (CHECK-IN) ---
+// --- GOODS RECEIVING (CHECK-IN) ---
 const CheckInView = ({ cycleId, gasId }) => {
-  const { t } = useTranslation(); // <-- FIX: Hook aggiunto per risolvere ReferenceError
+  const { t } = useTranslation(); // <-- FIX: hook added to resolve a ReferenceError
   const [products, setProducts] = useState([]);
   const [localQtys, setLocalQtys] = useState({});
   const [isSaving, setIsSaving] = useState(false);
@@ -102,7 +122,7 @@ const CheckInView = ({ cycleId, gasId }) => {
 
   const filtered = products.filter(p => p.product_name.toLowerCase().includes(searchTerm.toLowerCase()));
   
-  // Identifica i prodotti modificati
+  // Find the modified products
   const getChanged = () => products.filter(p => parseFloat(localQtys[p.product_id]) !== parseFloat(p.qty_received_total)).map(p => ({ productId: p.product_id, totalReceived: parseFloat(localQtys[p.product_id]) }));
 
   const handleSave = async () => {
@@ -119,7 +139,7 @@ const CheckInView = ({ cycleId, gasId }) => {
           gasId
       });
       setToast({ type: 'success', message: t('admin_logistics.save_success') }); 
-      fetchData(); // Ricarica per allineare i dati
+      fetchData(); // Reload to align the data
     } catch (err) { setToast({ type: 'error', message: t('common.error') }); }
     finally { setIsSaving(false); }
   };
@@ -159,8 +179,8 @@ const CheckInView = ({ cycleId, gasId }) => {
           <tbody className="divide-y divide-slate-50">
             {filtered.map(p => {
               const currentVal = parseFloat(localQtys[p.product_id] || 0);
-              const originalVal = parseFloat(p.qty_ordered); // Confronto con l'ordinato originale
-              const dbVal = parseFloat(p.qty_received_total); // Confronto con l'ultimo salvataggio
+              const originalVal = parseFloat(p.qty_ordered); // Compare with the original ordered quantity
+              const dbVal = parseFloat(p.qty_received_total); // Compare with the last save
               
               const isModified = currentVal !== dbVal;
               const diff = currentVal - originalVal;
@@ -200,9 +220,9 @@ const CheckInView = ({ cycleId, gasId }) => {
   );
 };
 
-// --- CONSEGNA (CHECK-OUT) ---
+// --- DELIVERY (CHECK-OUT) ---
 const CheckOutView = ({ cycleId, gasId }) => {
-  const { t } = useTranslation(); // <-- FIX: Hook aggiunto per risolvere ReferenceError
+  const { t } = useTranslation(); // <-- FIX: hook added to resolve a ReferenceError
   const [members, setMembers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);

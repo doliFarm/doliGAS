@@ -1,38 +1,57 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
- * doliGAS - Enterprise Resource Planning per Gruppi di Acquisto Solidale
- * Modulo Gestione Catalogo, Produttori e Categorie
+ * doliGAS - Catalog, producers and categories module
  * -----------------------------------------------------------------------------
  * FILE: backend/routes/admin/catalog.js
- * STATUS: Integro, Completo, Robusto.
- * FIX: Risoluzione Error 500 (Sanitizzazione tipi e fallback context GAS).
+ * STATUS: Stable.
+ * FIX: error 500 resolved (type sanitization and GAS context fallback).
  */
 
 const express = require('express');
 const router = express.Router();
 
 /**
- * Helper per acquisire il pool di connessioni singleton.
+ * Helper returning the singleton connection pool.
  */
 const getDb = () => global.pool || require('../../config/db');
 
 /**
- * Helper interno per estrarre il gasId in modo robusto da vari contesti
+ * Internal helper extracting the gasId from the request context
  */
-// SICUREZZA: solo il gasId verificato dal middleware verifyGasMembership
+// SECURITY: only the gasId verified by the verifyGasMembership middleware
 const getGasId = (req) => req.user?.verifiedGasId;
 
 const { parseCsv, parseNumber, parseBool } = require('../../utils/csv');
 
-// Limite di righe per un import, per non bloccare il server con un file enorme
+// Maximum rows per import, so a huge file cannot block the server
 const MAX_IMPORT_ROWS = 2000;
 
 // =============================================================================
-// SEZIONE PRODOTTI (CATALOGO)
+// PRODUCTS SECTION (CATALOG)
 // =============================================================================
 
 /**
  * GET /api/admin/catalog
- * Recupera l'elenco prodotti con JOIN su produttori, categorie, unità E STATO VALIDAZIONE.
+ * Lists products joined with producers, categories, units AND VALIDATION STATUS.
  */
 router.get('/', async (req, res) => {
     const pool = getDb();
@@ -69,7 +88,7 @@ router.get('/', async (req, res) => {
             LEFT JOIN product_units u ON p.unit_id = u.id
             WHERE pr.gas_id = ?
             ORDER BY pr.business_name ASC, p.name ASC
-        `, [gasId, gasId, gasId]); // I 3 parametri mappano i tre '?' nella query
+        `, [gasId, gasId, gasId]); // The 3 parameters map the three '?' in the query
         
         res.json(rows);
     } catch (e) {
@@ -80,7 +99,7 @@ router.get('/', async (req, res) => {
 
 /**
  * POST /api/admin/catalog/products
- * Crea o aggiorna un prodotto con protezione transazionale e sanitizzazione.
+ * Creates or updates a product, in a transaction and with input sanitization.
  */
 router.post('/products', async (req, res) => {
     const pool = getDb();
@@ -94,20 +113,20 @@ router.post('/products', async (req, res) => {
             price, stock, min_order_qty, is_active
         } = req.body;
 
-        // 1. Validazione Formale (Previene crash SQL)
+        // 1. Formal validation (prevents SQL crashes)
         if (!gasId) throw new Error("Sessione non valida: GAS ID mancante.");
         if (!producer_id || !unit_id || !name) throw new Error("Dati obbligatori mancanti.");
 
         await conn.beginTransaction();
 
-        // 2. Verifica Autorizzazione Multi-tenant
+        // 2. Multi-tenant authorization check
         const [prodCheck] = await conn.execute(
             "SELECT id FROM producers WHERE id = ? AND gas_id = ?",
             [producer_id, gasId]
         );
         if (prodCheck.length === 0) throw new Error("Produttore non autorizzato per questo GAS.");
 
-        // 3. Sanitizzazione Valori (NULL invece di stringhe vuote)
+        // 3. Value sanitization (NULL instead of empty strings)
         const cleanCategoryId = (category_id && category_id !== '') ? parseInt(category_id) : null;
         const cleanStock = (stock !== undefined && stock !== '' && stock !== null) ? parseFloat(stock) : null;
         const cleanPrice = parseFloat(price) || 0;
@@ -115,7 +134,7 @@ router.post('/products', async (req, res) => {
         const activeFlag = is_active ? 1 : 0;
 
         if (id) {
-            // MODIFICA PRODOTTO ESISTENTE
+            // EDIT AN EXISTING PRODUCT
             const [active] = await conn.execute(`
                 SELECT COUNT(*) as count FROM order_items oi 
                 JOIN orders o ON oi.order_id = o.id 
@@ -123,7 +142,7 @@ router.post('/products', async (req, res) => {
             `, [id]);
 
             if (active[0].count > 0) {
-                // Ordini attivi: Safe Update (Protezione integrità prezzi)
+                // Active orders: safe update (protects the prices of existing orders)
                 await conn.execute(`
                     UPDATE products SET 
                         name=?, category_id=?, is_active=?, updated_by=?, updated_at=NOW()
@@ -131,7 +150,7 @@ router.post('/products', async (req, res) => {
                     [name, cleanCategoryId, activeFlag, adminId, id]
                 );
             } else {
-                // Nessun ordine: Aggiornamento Totale
+                // No orders: full update
                 await conn.execute(`
                     UPDATE products SET 
                         name=?, producer_id=?, category_id=?, unit_id=?,
@@ -142,7 +161,7 @@ router.post('/products', async (req, res) => {
                 );
             }
         } else {
-            // INSERIMENTO NUOVO PRODOTTO
+            // INSERT A NEW PRODUCT
             await conn.execute(`
                 INSERT INTO products 
                 (producer_id, category_id, unit_id, name, price, stock, min_order_qty, is_active, created_by, updated_by)
@@ -164,7 +183,7 @@ router.post('/products', async (req, res) => {
 
 /**
  * PATCH /api/admin/catalog/bulk-status
- * Azione massiva per attivazione/disattivazione prodotti.
+ * Bulk activation/deactivation of products.
  */
 router.patch('/bulk-status', async (req, res) => {
     const { ids, is_active } = req.body;
@@ -202,7 +221,7 @@ router.patch('/bulk-status', async (req, res) => {
 });
 
 // =============================================================================
-// SEZIONE PRODUTTORI
+// PRODUCERS SECTION
 // =============================================================================
 
 router.get('/producers', async (req, res) => {
@@ -247,7 +266,7 @@ router.post('/producers', async (req, res) => {
 });
 
 // =============================================================================
-// SEZIONE CATEGORIE E UNITÀ
+// CATEGORIES AND UNITS SECTION
 // =============================================================================
 
 router.get('/categories', async (req, res) => {
@@ -276,12 +295,12 @@ router.get('/units', async (req, res) => {
 
 
 // =============================================================================
-// SEZIONE IMPORT DA CSV
+// CSV IMPORT SECTION
 // =============================================================================
 
 /**
- * Colonne accettate nel CSV. La prima è il nome canonico, le altre sono alias
- * (anche in inglese) riconosciuti nell'intestazione.
+ * Columns accepted in the CSV. The first is the canonical name, the others are aliases
+ * (English ones too) recognized in the header.
  */
 const CSV_COLUMNS = {
     nome: ['nome', 'prodotto', 'name', 'product'],
@@ -294,7 +313,7 @@ const CSV_COLUMNS = {
     attivo: ['attivo', 'active', 'isactive']
 };
 
-/** Trova il valore di una colonna logica in una riga, provando tutti gli alias. */
+/** Finds the value of a logical column in a row, trying all aliases. */
 const pick = (row, key) => {
     for (const alias of CSV_COLUMNS[key]) {
         if (row[alias] !== undefined && String(row[alias]).trim() !== '') return String(row[alias]).trim();
@@ -302,7 +321,7 @@ const pick = (row, key) => {
     return '';
 };
 
-/** Carica le anagrafiche del GAS necessarie a risolvere i nomi del CSV in identificativi. */
+/** Loads the GAS master data needed to resolve CSV names into ids. */
 const loadLookups = async (pool, gasId) => {
     const [producers] = await pool.execute(
         "SELECT id, business_name FROM producers WHERE gas_id = ? AND is_active = 1", [gasId]);
@@ -327,8 +346,8 @@ const loadLookups = async (pool, gasId) => {
 };
 
 /**
- * Controlla una riga e restituisce { row, errors }.
- * row contiene già gli identificativi risolti, pronti per l'inserimento.
+ * Checks a row and returns { row, errors }.
+ * row already contains the resolved ids, ready to be inserted.
  */
 const validateRow = (raw, lookups) => {
     const errors = [];
@@ -383,9 +402,9 @@ const validateRow = (raw, lookups) => {
 };
 
 /**
- * Rivalidazione delle righe che il client rimanda indietro per l'import.
- * I dati arrivano già risolti in identificativi, ma non sono attendibili:
- * qui si verifica che ogni identificativo appartenga davvero a questo GAS.
+ * Revalidation of the rows the client sends back for the import.
+ * The data arrive already resolved into ids, but cannot be trusted:
+ * here we check that every id really belongs to this GAS.
  */
 const validatePayloadRow = (p, lookups) => {
     const errors = [];
@@ -432,8 +451,8 @@ const validatePayloadRow = (p, lookups) => {
 
 /**
  * POST /api/admin/catalog/validate
- * Controlla il CSV senza scrivere niente e restituisce il riepilogo che il
- * frontend mostra prima di confermare l'import.
+ * Checks the CSV without writing anything and returns the summary that the
+ * frontend shows before the import is confirmed.
  */
 router.post('/validate', async (req, res) => {
     const pool = getDb();
@@ -477,15 +496,15 @@ router.post('/validate', async (req, res) => {
 
 /**
  * POST /api/admin/catalog/bulk-import
- * Scrive le righe valide. Un prodotto con lo stesso nome dello stesso produttore
- * viene aggiornato invece di essere duplicato, così reimportare un listino
- * aggiornato funziona.
+ * Writes the valid rows. A product with the same name from the same producer
+ * is updated instead of duplicated, so re-importing an updated price list
+ * works.
  *
- * I dati del client non sono considerati attendibili: ogni riga viene validata
- * di nuovo qui contro le anagrafiche del GAS.
+ * Client data are not trusted: every row is validated again here against
+ * the GAS master data.
  *
- * Il prezzo di un prodotto con ordini in corso NON viene toccato, come nella
- * modifica manuale: cambierebbe il totale di ordini già fatti.
+ * The price of a product with orders in progress is NOT touched, as in manual
+ * editing: it would change the total of orders already placed.
  */
 router.post('/bulk-import', async (req, res) => {
     const pool = getDb();
@@ -530,7 +549,7 @@ router.post('/bulk-import', async (req, res) => {
                     WHERE oi.product_id = ? AND o.status IN ('draft', 'confirmed')`, [productId]);
 
                 if (active[0].count > 0) {
-                    // Ordini in corso: si aggiorna tutto tranne il prezzo
+                    // Orders in progress: update everything except the price
                     await conn.execute(`
                         UPDATE products SET category_id = ?, unit_id = ?, stock = ?,
                             min_order_qty = ?, is_active = ?, updated_at = NOW(), updated_by = ?
@@ -557,8 +576,8 @@ router.post('/bulk-import', async (req, res) => {
         }
 
         /**
-         * Il listino è cambiato: le validazioni dei produttori interessati decadono,
-         * come avviene quando modificano i prodotti da soli.
+         * The price list changed: the validations of the producers involved lapse,
+         * as happens when they edit their products themselves.
          */
         await conn.execute(`
             DELETE v FROM producer_cycle_validations v
@@ -577,12 +596,12 @@ router.post('/bulk-import', async (req, res) => {
 });
 
 // =============================================================================
-// SEZIONE ELIMINAZIONE
+// DELETE SECTION
 // =============================================================================
 
 /**
  * DELETE /api/admin/catalog/:id
- * Gestisce Hard Delete (se mai usato) o Soft Delete (se presente in ordini).
+ * Hard delete (if never used) or soft delete (if present in orders).
  */
 router.delete('/:id', async (req, res) => {
     const pool = getDb();
@@ -590,16 +609,16 @@ router.delete('/:id', async (req, res) => {
     const productId = req.params.id;
 
     try {
-        // 1. Verifica integrità referenziale in order_items (storico ordini)
+        // 1. Referential integrity check on order_items (order history)
         const [usage] = await pool.execute("SELECT id FROM order_items WHERE product_id = ? LIMIT 1", [productId]);
         
         if (usage.length > 0) {
-            // Preserva i dati storici disattivando il prodotto invece di cancellarlo
+            // Keep historical data by deactivating the product instead of deleting it
             await pool.execute("UPDATE products SET is_active = 0 WHERE id = ?", [productId]);
             return res.json({ success: true, message: "Archiviato causa storico ordini." });
         }
 
-        // 2. Eliminazione fisica (solo se appartiene al GAS)
+        // 2. Physical delete (only if it belongs to the GAS)
         const [result] = await pool.execute(`
             DELETE p FROM products p 
             JOIN producers pr ON p.producer_id = pr.id 

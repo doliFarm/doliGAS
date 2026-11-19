@@ -1,30 +1,48 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
- * doliGAS - Enterprise Resource Planning per Gruppi di Acquisto Solidale
- * * Middleware di Autenticazione e Autorizzazione
+ * doliGAS - Authentication and authorization middleware
  * -----------------------------------------------------------------------------
- * Questo modulo gestisce la verifica dei JSON Web Tokens (JWT) e l'iniezione
- * del contesto utente/GAS nelle richieste autenticate.
- * STATUS: Integro, Completo, Robusto.
- * FIX: Allineato l'export (authenticateToken) per prevenire il crash di Express.
- * * @module middlewares/auth
- * @license GNU GPLv3 (o successiva)
+ * This module verifies JSON Web Tokens (JWT) and injects the user/GAS
+ * context into authenticated requests.
+ * FIX: aligned the export (authenticateToken) to prevent an Express crash.
+ * @module middlewares/auth
  */
 
 const jwt = require('jsonwebtoken');
 
 /**
- * Middleware principale per l'autenticazione JWT.
- * Verifica la presenza e la validità del token nell'header Authorization.
- * * Requisiti di Robustezza:
- * 1. Previene l'esecuzione se la chiave segreta non è configurata (fail-fast).
- * 2. Gestisce i vari formati di errore JWT (scadenza, firma non valida).
- * 3. Preserva l'integrità dei dati utente per i middleware successivi.
+ * Main JWT authentication middleware.
+ * Checks that a valid token is present in the Authorization header.
+ *
+ * Robustness requirements:
+ * 1. Refuses to run if the secret key is not configured (fail fast).
+ * 2. Handles the different JWT error cases (expired, invalid signature).
+ * 3. Preserves the user data for the following middleware.
  */
 const auth = (req, res, next) => {
-  // Recupero della chiave segreta dalle variabili d'ambiente
+  // Read the secret key from the environment
   const JWT_SECRET = process.env.JWT_SECRET;
 
-  // SICUREZZA: Blocco critico in assenza di configurazione
+  // SECURITY: hard stop when the configuration is missing
   if (!JWT_SECRET) {
     console.error('[CRITICAL] JWT_SECRET non configurato nel file .env');
     return res.status(500).json({ 
@@ -33,7 +51,7 @@ const auth = (req, res, next) => {
     });
   }
 
-  // Estrazione del token dall'header Authorization (formato: "Bearer TOKEN")
+  // Extract the token from the Authorization header (format: "Bearer TOKEN")
   const authHeader = req.header('Authorization');
   const token = authHeader && authHeader.split(' ')[1];
 
@@ -45,21 +63,21 @@ const auth = (req, res, next) => {
   }
 
   try {
-    // Verifica del token
+    // Token verification
     const decoded = jwt.verify(token, JWT_SECRET);
     
     /**
-     * Iniezione del contesto utente nella richiesta.
-     * decoded deve contenere: { id, email, gas_id, role_id }
+     * Inject the user context into the request.
+     * decoded must contain: { id, email, gas_id, role_id }
      */
     req.user = decoded;
     
-    // Log di monitoraggio per debugging (opzionale in base al livello di log)
-    // console.log(`[AUTH] Utente ${decoded.id} autenticato per GAS ${decoded.gas_id}`);
+    // Monitoring log for debugging (optional, depending on the log level)
+    // console.log(`[AUTH] User ${decoded.id} authenticated for GAS ${decoded.gas_id}`);
     
     next();
   } catch (err) {
-    // Gestione differenziata degli errori JWT per una migliore UX e sicurezza
+    // Separate handling of JWT errors, for better UX and security
     if (err.name === 'TokenExpiredError') {
       return res.status(401).json({ 
         error: 'Sessione scaduta. Effettuare nuovamente il login.',
@@ -75,8 +93,8 @@ const auth = (req, res, next) => {
 };
 
 /**
- * Middleware opzionale per l'estrazione del contesto GAS da slug o header.
- * Utile per operazioni pubbliche che richiedono comunque la distinzione del tenant.
+ * Optional middleware that extracts the GAS context from a slug or a header.
+ * Useful for public operations that still need to tell tenants apart.
  */
 const injectGasContext = (req, res, next) => {
   const gasSlug = req.header('X-GAS-Slug') || req.query.gas;
@@ -88,9 +106,9 @@ const injectGasContext = (req, res, next) => {
 
 
 
-// Esportazione Completa e Robusta
+// Exports
 module.exports = {
   auth,
-  authenticateToken: auth, // <--- FIX CRITICO: Aggiunto l'alias usato da tutti i router
+  authenticateToken: auth, // <--- CRITICAL FIX: alias used by all routers
   injectGasContext
 };

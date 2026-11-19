@@ -1,4 +1,24 @@
-// Produttore: listino, validazione per ciclo, conferma della fornitura
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
+// Producer: price list, per-cycle validation, supply confirmation
 const { as, resetDb, closePool, sql, setPhase, USERS, GAS_ID, CYCLE_ID } = require('./helpers');
 
 afterAll(closePool);
@@ -47,7 +67,7 @@ describe('listino', () => {
 
     test('non si modificano i prodotti di un altro produttore', async () => {
         await setPhase('listini');
-        await bulk([item(1, 99)]); // Arance, di Azienda Agricola Sole
+        await bulk([item(1, 99)]); // Oranges, from Azienda Agricola Sole
         expect((await sql('SELECT price FROM products WHERE id = 1'))[0].price).toBe('2.00');
     });
 
@@ -69,14 +89,14 @@ describe('conferma della fornitura', () => {
     test('a mercato chiuso: salvata per il ciclo, senza toccare lo stock del listino', async () => {
         await setPhase('chiuso');
         await sql('UPDATE products SET stock = 10 WHERE id = 4');
-        const r = await confirm([{ id: 4, qty: 5 }, { id: 1, qty: 9 }]); // il prodotto 1 non è suo
+        const r = await confirm([{ id: 4, qty: 5 }, { id: 1, qty: 9 }]); // product 1 is not theirs
         expect(r.status).toBe(200);
         expect(r.body.updated).toBe(1);
         expect(await sql('SELECT product_id, confirmed_qty FROM producer_cycle_supply WHERE cycle_id = ?', [CYCLE_ID]))
             .toEqual([{ product_id: 4, confirmed_qty: '5.000' }]);
         expect((await sql('SELECT stock FROM products WHERE id = 4'))[0].stock).toBe(10);
 
-        // Una nuova conferma sostituisce la precedente, e il produttore la rivede
+        // A new confirmation replaces the previous one, and the producer sees it
         await confirm([{ id: 4, qty: 4 }]);
         const list = await caseificio().get(`/api/products?producerId=${PID}`);
         expect(Number(list.body.products.find(p => p.id === 4).confirmed_qty)).toBe(4);

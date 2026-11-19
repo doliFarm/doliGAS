@@ -1,10 +1,30 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * @file frontend/src/views/admin/CoordProducers.jsx
  * @version v1.1.0
  * @author Luigi GRILLO @ doliFarm.com
- * @description Gestione Anagrafica Produttori. Interfaccia per invitare/attivare produttori e gestire i dati aziendali.
- * Fix: Barra azioni massive uniformata (bottom), i18n totale, ottimizzazione mobile.
- * @status Integro, Completo, Robusto.
+ * @description Producer registry. Interface to invite/activate producers and manage their business data.
+ * Fix: bulk actions bar aligned (bottom), full i18n, mobile optimization.
+ * @status Stable
  * @date 2026-02-24
  */
 
@@ -25,20 +45,20 @@ export const CoordProducers = () => {
   const { activeProfile } = useAuth();
   const { t } = useTranslation();
   
-  // --- STATI DATI ---
+  // --- DATA STATE ---
   const [producers, setProducers] = useState([]);
   const [members, setMembers] = useState([]); 
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [toast, setToast] = useState(null);
   
-  // --- STATI VISTA E FILTRI ---
+  // --- VIEW AND FILTER STATE ---
   const [viewMode, setViewMode] = useState('TABLE');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
   const [sortConfig, setSortConfig] = useState({ key: 'business_name', direction: 'asc' });
 
-  // --- STATI MODALI ---
+  // --- MODAL STATE ---
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [isMsgModalOpen, setIsMsgModalOpen] = useState(false);
@@ -46,7 +66,7 @@ export const CoordProducers = () => {
   const [msgRecipients, setMsgRecipients] = useState([]); 
   const [isSendingMsg, setIsSendingMsg] = useState(false);
 
-  // --- FETCH DATI ---
+  // --- DATA FETCH ---
   const fetchData = async () => {
     if (!activeProfile?.context_id) return;
     setLoading(true);
@@ -69,7 +89,7 @@ export const CoordProducers = () => {
 
   useEffect(() => { fetchData(); }, [activeProfile]);
 
-  // --- ORDINAMENTO E FILTRAGGIO ---
+  // --- SORTING AND FILTERING ---
   const handleSort = (key) => {
     let direction = 'asc';
     if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
@@ -339,7 +359,7 @@ export const CoordProducers = () => {
         ))}
       </div>
 
-      {/* --- BARRA AZIONI MASSIVE (Uniformata UX) --- */}
+      {/* --- BULK ACTIONS BAR (aligned UX) --- */}
       {selectedIds.length > 0 && (
           <div className="fixed bottom-20 lg:bottom-10 left-4 right-4 lg:left-1/2 lg:-translate-x-1/2 lg:w-max bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center justify-between lg:gap-8 z-50 border border-slate-700 animate-in slide-in-from-bottom-10 duration-300">
               <div className="flex items-center gap-3">
@@ -364,7 +384,7 @@ export const CoordProducers = () => {
           </div>
       )}
 
-      {/* MODALE EDIT/CREATE */}
+      {/* EDIT/CREATE MODAL */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editing?.id ? t('admin_producers.modal_edit_title') : t('admin_producers.modal_new_title')}>
           <div className="p-1 space-y-4 max-h-[75vh] overflow-y-auto">
               <Input label={t('admin_producers.field_business_name')} value={editing?.business_name || ''} onChange={e => setEditing({...editing, business_name: e.target.value})} />
@@ -416,7 +436,7 @@ export const CoordProducers = () => {
           </div>
       </Modal>
 
-      {/* MODALE MESSAGGIO */}
+      {/* MESSAGE MODAL */}
       <Modal isOpen={isMsgModalOpen} onClose={() => setIsMsgModalOpen(false)} title={t('admin_producers.modal_msg_title')}>
         <form onSubmit={handleSendMessage} className="p-1 space-y-5">
            <div className="bg-blue-50 p-4 rounded-2xl flex items-start gap-3 text-blue-700 text-xs border border-blue-100">

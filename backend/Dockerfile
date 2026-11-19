@@ -8,7 +8,7 @@ RUN npm install
 FROM base as dev
 RUN npm install -g nodemon
 COPY . .
-# AUTOMATISMO: Qui forziamo development
+# Force development here
 ENV NODE_ENV=development
 EXPOSE 3000
 CMD ["nodemon", "server.js"]
@@ -16,7 +16,7 @@ CMD ["nodemon", "server.js"]
 # --- PRODUCTION STAGE (Target: prod) ---
 FROM base as prod
 COPY . .
-# AUTOMATISMO: Qui forziamo production
+# Force production here
 ENV NODE_ENV=production
 EXPOSE 3000
 CMD ["node", "server.js"]

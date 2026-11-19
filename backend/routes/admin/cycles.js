@@ -1,3 +1,23 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * @file backend/routes/admin/cycles.js
  * @version v1.0.0
@@ -11,13 +31,13 @@ const express = require('express');
 const router = express.Router();
 const { verifyGasMembership } = require('../../middlewares/roles');
 
-// --- HELPER RECUPERO DB SICURO ---
+// --- SAFE DB HELPER ---
 const getDb = () => global.pool || require('../../config/db');
 
-// Protezione multi-profilo: inietta req.user.verifiedGasId
+// Multi-profile protection: injects req.user.verifiedGasId
 router.use(verifyGasMembership('Coordinatore'));
 
-// --- HELPERS DATE ---
+// --- DATE HELPERS ---
 const addDays = (dateStr, days) => {
     const d = new Date(dateStr);
     d.setDate(d.getDate() + days);
@@ -31,9 +51,9 @@ const addMonths = (dateStr, months) => {
 };
 
 /**
- * Le sette date del ciclo, in ordine obbligatorio.
- * Il frontend fa già questo controllo, ma il server non può fidarsi del client:
- * date fuori sequenza manderebbero lo scheduler e la bottega in stati incoerenti.
+ * The seven cycle dates, in mandatory order.
+ * The frontend already performs this check, but the server cannot trust the client:
+ * out-of-sequence dates would put the scheduler and the shop in inconsistent states.
  */
 const CYCLE_DATES = [
     ['start_at', 'G1 avvio'],
@@ -46,22 +66,22 @@ const CYCLE_DATES = [
 ];
 
 /**
- * Converte una data nel formato accettato da MySQL ('YYYY-MM-DD HH:MM:SS').
- * Il frontend usa un campo datetime-local, che manda 'YYYY-MM-DDTHH:MM' senza fuso:
- * la conversione è testuale di proposito, così l'ora resta quella scritta
- * dall'utente e non viene spostata da un passaggio attraverso UTC.
+ * Converts a date to the format accepted by MySQL ('YYYY-MM-DD HH:MM:SS').
+ * The frontend uses a datetime-local field, which sends 'YYYY-MM-DDTHH:MM' without a time zone:
+ * the conversion is textual on purpose, so the time stays the one typed by the
+ * user and is not shifted by a round trip through UTC.
  */
 const toMysqlDateTime = (value) => {
     if (!value) return null;
     const s = String(value).trim()
         .replace('T', ' ')
-        .replace(/\.\d+/, '')      // millisecondi
-        .replace(/Z$/i, '')        // indicatore UTC
-        .replace(/[+-]\d{2}:?\d{2}$/, ''); // scostamento di fuso
+        .replace(/\.\d+/, '')      // milliseconds
+        .replace(/Z$/i, '')        // UTC designator
+        .replace(/[+-]\d{2}:?\d{2}$/, ''); // time zone offset
     return /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(s) ? `${s}:00` : s;
 };
 
-/** Restituisce un messaggio d'errore, oppure null se le date sono valide. */
+/** Returns an error message, or null if the dates are valid. */
 const validateCycleDates = (body) => {
     const parsed = [];
     for (const [field, label] of CYCLE_DATES) {
@@ -79,7 +99,7 @@ const validateCycleDates = (body) => {
     return null;
 };
 
-// --- 1. RECUPERO SCHEMA OFFSET (G1-G7) ---
+// --- 1. LOAD OFFSET SCHEMA (G1-G7) ---
 router.get('/schema', async (req, res) => {
     const pool = getDb();
     try {
@@ -101,7 +121,7 @@ router.get('/schema', async (req, res) => {
     }
 });
 
-// --- 2. CREAZIONE CICLI CON RIPETIZIONE ---
+// --- 2. CREATE CYCLES WITH REPETITION ---
 router.post('/', async (req, res) => {
     const { 
         name, start_at, producers_deadline, market_open_at, 
@@ -165,8 +185,8 @@ router.post('/', async (req, res) => {
 
 /**
  * PUT /api/admin/cycles/:id
- * Modifica un ciclo esistente: nome e le sette date. La ripetizione non si applica
- * alla modifica, che riguarda sempre un ciclo solo.
+ * Edits an existing cycle: name and the seven dates. Repetition does not apply
+ * to editing, which always concerns a single cycle.
  */
 router.put('/:id', async (req, res) => {
     const pool = getDb();
@@ -198,9 +218,9 @@ router.put('/:id', async (req, res) => {
         );
 
         /**
-         * Spostare una data in avanti rimette in gioco una tappa già notificata:
-         * togliamo dal registro gli eventi la cui data è tornata nel futuro, così
-         * lo scheduler li invierà di nuovo al momento giusto.
+         * Moving a date forward brings back into play a step already notified:
+         * we remove from the log the events whose date is in the future again, so
+         * the scheduler will send them again at the right time.
          */
         await pool.execute(`
             DELETE ce FROM cycle_events ce
@@ -221,7 +241,7 @@ router.put('/:id', async (req, res) => {
     }
 });
 
-// --- 3. STORICO CICLI ---
+// --- 3. CYCLE HISTORY ---
 router.get('/history', async (req, res) => {
     const pool = getDb();
     try {
@@ -235,7 +255,7 @@ router.get('/history', async (req, res) => {
     }
 });
 
-// --- 4. GESTIONE FESTIVITÀ (CRUD COMPLETO) ---
+// --- 4. HOLIDAYS (FULL CRUD) ---
 router.get('/holidays', async (req, res) => {
     const pool = getDb();
     try {
@@ -274,7 +294,7 @@ router.delete('/holidays/:id', async (req, res) => {
     } catch (e) { res.status(500).json({ error: "Errore eliminazione festività" }); }
 });
 
-// --- 5. ELIMINAZIONE CICLO ---
+// --- 5. DELETE CYCLE ---
 router.delete('/:id', async (req, res) => {
     const pool = getDb();
     try {
@@ -286,7 +306,7 @@ router.delete('/:id', async (req, res) => {
     } catch (e) { res.status(500).json({ error: "Errore eliminazione ciclo" }); }
 });
 
-// --- 6. AGGIORNAMENTO SCHEMA OFFSET ---
+// --- 6. UPDATE OFFSET SCHEMA ---
 router.put('/schema', async (req, res) => {
     const { g1, g2, g3, g4, g5, g6, g7 } = req.body;
     const pool = getDb();
@@ -305,7 +325,7 @@ router.put('/schema', async (req, res) => {
     }
 });
 
-// --- 7. AGGIORNAMENTO STATO ATTIVO ---
+// --- 7. UPDATE ACTIVE STATUS ---
 router.patch('/:id/status', async (req, res) => {
     const { is_active } = req.body;
     const pool = getDb();

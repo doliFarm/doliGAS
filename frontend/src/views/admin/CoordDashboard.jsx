@@ -1,15 +1,35 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * @file frontend/src/views/admin/CoordDashboard.jsx
  * @version v1.1.0
  * @author Luigi GRILLO @ doliFarm.com
- * @description Admin Dashboard interattiva. KPI cliccabili per navigazione rapida.
- * @status Integro, Completo, Robusto.
+ * @description Interactive admin dashboard. Clickable KPIs for quick navigation.
+ * @status Stable
  * @date 2026-02-24
  */
 
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom'; // <--- Import per navigazione
+import { useNavigate } from 'react-router-dom'; // <--- Import for navigation
 import axios from 'axios';
 import { 
   TrendingUp, Users, Calendar, Loader2, Calendar as CalendarIcon, 
@@ -28,7 +48,7 @@ const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'
 export const CoordDashboard = () => {
   const { activeProfile } = useAuth();
   const { t } = useTranslation();
-  const navigate = useNavigate(); // <--- Hook navigazione
+  const navigate = useNavigate(); // <--- Navigation hook
   
   const [data, setData] = useState({ 
     stats: null, 
@@ -109,7 +129,7 @@ export const CoordDashboard = () => {
   return (
     <div className="max-w-full overflow-hidden space-y-4 sm:space-y-8 pb-10 animate-in fade-in duration-500 px-4">
       
-      {/* HEADER CON FILTRI */}
+      {/* HEADER WITH FILTERS */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-100">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-emerald-100 text-emerald-700 rounded-xl shrink-0">
@@ -146,7 +166,7 @@ export const CoordDashboard = () => {
         </div>
       </div>
 
-      {/* KPI GRID - CLICCABILI */}
+      {/* KPI GRID - CLICKABLE */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <StatsCard 
           title="VOLUME ORDINI" 
@@ -178,7 +198,7 @@ export const CoordDashboard = () => {
         />
       </div>
 
-      {/* GRAFICI ANALYTICS */}
+      {/* ANALYTICS CHARTS */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         <ChartCard title="DISTRIBUZIONE PER PRODUTTORE" icon={Leaf}>
           <div className="h-[300px] w-full min-w-0">
@@ -216,7 +236,7 @@ export const CoordDashboard = () => {
         </ChartCard>
       </div>
 
-      {/* CLASSIFICA PRODOTTI TOP */}
+      {/* TOP PRODUCTS RANKING */}
       <Card className="overflow-hidden border-none shadow-sm bg-white">
         <div className="p-4 sm:p-5 bg-emerald-600 flex justify-between items-center text-white">
           <h3 className="font-bold flex items-center gap-2 uppercase text-[10px] sm:text-xs tracking-widest">
@@ -252,7 +272,7 @@ export const CoordDashboard = () => {
   );
 };
 
-// --- SOTTO-COMPONENTI UI ---
+// --- UI SUBCOMPONENTS ---
 const StatsCard = ({ title, value, icon: Icon, color, action, desc }) => {
   const colorVariants = {
     emerald: 'text-emerald-600 bg-emerald-50',

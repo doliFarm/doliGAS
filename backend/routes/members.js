@@ -1,10 +1,30 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * @file backend/routes/members.js
  * @version v1.2.6
  * @author Luigi GRILLO @ doliFarm.com
- * @description API Verticali per l'Area Socio. Gestione Dashboard, Bottega, Ordini e Wallet.
- * STATUS: Integro, Completo, Robusto.
- * FIX: Allineamento ENUM Schema v22.0 (confirmed/SPESA) e risoluzione Error 500.
+ * @description Member area API: dashboard, shop, orders and wallet.
+ * STATUS: Stable.
+ * FIX: aligned with schema v22.0 enums (confirmed/SPESA), fixed error 500.
  */
 
 const express = require('express');
@@ -13,22 +33,22 @@ const { authenticateToken } = require('../middlewares/auth');
 const { notifyCoordinatorRaw } = require('../utils/notifications');
 
 /**
- * Helper per acquisire il pool di connessioni singleton.
+ * Helper returning the singleton connection pool.
  */
 const getDb = () => global.pool || require('../config/db');
 
 /**
- * Helper robusto per l'estrazione del gasId (Fallback multi-livello).
+ * Helper extracting the gasId (multi-level fallback).
  */
 const getGasId = (req) => {
     const id = req.user?.verifiedGasId || req.query?.gasId || req.body?.gasId || req.user?.gas_id;
     return (id && id !== 'undefined' && id !== 'null') ? parseInt(id) : null;
 };
 
-// Tutte le rotte richiedono autenticazione JWT
+// All routes require JWT authentication
 router.use(authenticateToken);
 
-// --- MIDDLEWARE: Verifica Appartenenza GAS ---
+// --- MIDDLEWARE: GAS membership check ---
 const ensureMembership = async (req, res, next) => {
     const gasId = getGasId(req);
     if (!gasId) return res.status(400).json({ error: "Contesto GAS mancante" });
@@ -58,14 +78,14 @@ router.get('/dashboard', ensureMembership, async (req, res) => {
     const userId = req.user.id;
     const gasId = req.gasId;
 
-    // A. Saldo Attuale
+    // A. Current balance
     const [membership] = await pool.execute(
         "SELECT balance FROM gas_memberships WHERE user_id = ? AND gas_id = ?", 
         [userId, gasId]
     );
     const balance = parseFloat(membership[0]?.balance || 0);
 
-    // B. Ciclo Attivo (Prossima Consegna)
+    // B. Active cycle (next delivery)
     const [cycles] = await pool.execute(`
         SELECT id, name, delivery_at, market_open_at, market_close_at 
         FROM cycles 
@@ -85,7 +105,7 @@ router.get('/dashboard', ensureMembership, async (req, res) => {
         else if (now < open) marketStatus = 'COMING_SOON';
     }
 
-    // C. Dati Ultimo Ordine
+    // C. Last order data
     const [orders] = await pool.execute(`
         SELECT id, status, total_amount, created_at
         FROM orders 
@@ -107,7 +127,7 @@ router.get('/dashboard', ensureMembership, async (req, res) => {
         };
     }
 
-    // D. Notifiche (Ultime 3)
+    // D. Notifications (last 3)
     let messages = [];
     try {
        const [msgs] = await pool.execute(`
@@ -136,7 +156,7 @@ router.get('/dashboard', ensureMembership, async (req, res) => {
 });
 
 // =============================================================================
-// 2. SHOP (CATALOGO) - FIX: Filtro Validazione Listino v23.0
+// 2. SHOP (CATALOG) - FIX: price list validation filter v23.0
 // =============================================================================
 
 router.get('/shop', ensureMembership, async (req, res) => {
@@ -144,7 +164,7 @@ router.get('/shop', ensureMembership, async (req, res) => {
         const pool = getDb();
         const gasId = req.gasId;
 
-        // 1. Recupero ciclo attivo
+        // 1. Load the active cycle
         const [cycles] = await pool.execute(`
             SELECT id, market_open_at, market_close_at 
             FROM cycles 
@@ -162,10 +182,10 @@ router.get('/shop', ensureMembership, async (req, res) => {
         const isOpen = now >= new Date(cycles[0].market_open_at) && now < new Date(cycles[0].market_close_at);
 
         /**
-         * 2. Recupero Prodotti filtrati per VALIDAZIONE LISTINO
-         * Usiamo INNER JOIN sulla tabella delle validazioni. 
-         * Se il produttore non ha validato per questo specifico cycleId, 
-         * i suoi prodotti spariscono dal listino soci.
+         * 2. Load the products filtered by PRICE LIST VALIDATION
+         * INNER JOIN on the validations table:
+         * if the producer has not validated this specific cycleId,
+         * its products disappear from the members' catalog.
          */
         const query = `
             SELECT 
@@ -197,7 +217,7 @@ router.get('/shop', ensureMembership, async (req, res) => {
 
         const [products] = await pool.execute(query, [cycleId, req.user.id, gasId, cycleId]);
 
-        // mysql2 restituisce i DECIMAL come stringhe: il frontend confronta available con dei numeri
+        // mysql2 returns DECIMAL values as strings: the frontend compares available with numbers
         for (const p of products) {
             if (p.available !== null) p.available = Number(p.available);
         }
@@ -211,7 +231,7 @@ router.get('/shop', ensureMembership, async (req, res) => {
 });
 
 // =============================================================================
-// 3. GESTIONE ORDINI (CHECKOUT)
+// 3. ORDER MANAGEMENT (CHECKOUT)
 // =============================================================================
 
 router.post('/order', ensureMembership, async (req, res) => {
@@ -226,13 +246,13 @@ router.post('/order', ensureMembership, async (req, res) => {
 
     const conn = await pool.getConnection();
     try {
-        // READ COMMITTED (solo per questa transazione): dopo il lock sul prodotto la somma
-        // delle quantità già ordinate deve vedere gli ordini appena confermati dagli altri.
-        // Con REPEATABLE READ leggerebbe la fotografia presa alla prima SELECT.
+        // READ COMMITTED (for this transaction only): after the lock on the product, the sum
+        // of the quantities already ordered must see orders just confirmed by others.
+        // With REPEATABLE READ it would read the snapshot taken at the first SELECT.
         await conn.query("SET TRANSACTION ISOLATION LEVEL READ COMMITTED");
         await conn.beginTransaction();
 
-        // SICUREZZA: il ciclo deve appartenere al GAS, essere attivo e avere il mercato aperto
+        // SECURITY: the cycle must belong to the GAS, be active and have the market open
         const [openCycle] = await conn.execute(
             `SELECT id FROM cycles
              WHERE id = ? AND gas_id = ? AND is_active = 1
@@ -241,9 +261,9 @@ router.post('/order', ensureMembership, async (req, res) => {
         );
         if (openCycle.length === 0) throw new Error("MERCATO_CHIUSO: il ciclo non è aperto agli ordini.");
 
-        // Validazione quantità (numeri positivi). Le righe dello stesso prodotto vengono
-        // sommate, e i prodotti ordinati per id: i lock FOR UPDATE sullo stock vengono
-        // presi sempre nello stesso ordine, così due ordini in parallelo non si bloccano a vicenda.
+        // Quantity validation (positive numbers). Lines for the same product are
+        // summed and products sorted by id: the FOR UPDATE locks on stock are always
+        // taken in the same order, so two parallel orders cannot deadlock each other.
         const merged = new Map();
         for (const item of items) {
             const q = Number(item.qty);
@@ -255,18 +275,18 @@ router.post('/order', ensureMembership, async (req, res) => {
             .sort((a, b) => a[0] - b[0])
             .map(([productId, qty]) => ({ productId, qty }));
 
-        // A. Configurazione GAS (Fiducia/Prepagato)
+        // A. GAS configuration (trust/prepaid)
         const [gasConfig] = await conn.execute("SELECT allow_insufficient_balance FROM gas WHERE id = ?", [gasId]);
         const canGoNegative = gasConfig.length > 0 && gasConfig[0].allow_insufficient_balance === 1;
 
-       // B. Verifica prezzi correnti, disponibilità e VALIDAZIONE LISTINO
+       // B. Check current prices, availability and PRICE LIST VALIDATION
         let newTotal = 0;
         const validatedItems = [];
         const stockShortages = [];
 
         for (const item of cartItems) {
-            // Query rinforzata: verifichiamo is_active del prodotto, del produttore
-            // e soprattutto la validazione del listino per il ciclo specifico
+            // Hardened query: check is_active of the product and of the producer
+            // and above all the price list validation for this specific cycle
             const [pRow] = await conn.execute(`
                 SELECT p.name, p.price, p.stock, p.is_active
                 FROM products p
@@ -281,16 +301,16 @@ router.post('/order', ensureMembership, async (req, res) => {
             `, [item.productId, cycleId, gasId]);
 
             if (pRow.length === 0) {
-                // Il prodotto non esiste, non è attivo o il produttore non ha validato il listino
+                // The product does not exist, is not active, or the producer has not validated the price list
                 throw new Error(`PRODOTTO_NON_DISPONIBILE: L'articolo ID ${item.productId} non è acquistabile in questo ciclo.`);
             }
             
-            // Stock: products.stock è il tetto del listino per il ciclo (NULL = illimitato).
-            // Non viene mai scalato: il disponibile si calcola sottraendo quanto hanno già
-            // ordinato gli altri soci nel ciclo. L'ordine del socio stesso non si conta,
-            // perché verrà sostituito da questo.
+            // Stock: products.stock is the price list cap for the cycle (NULL = unlimited).
+            // It is never decremented: availability is computed by subtracting what the other
+            // members have already ordered in the cycle. The member's own order does not count,
+            // because it is about to be replaced by this one.
             if (pRow[0].stock !== null) {
-                // Lock sulla riga del prodotto: due soci non possono prendere insieme l'ultima unità
+                // Lock on the product row: two members cannot take the last unit at the same time
                 await conn.execute("SELECT id FROM products WHERE id = ? FOR UPDATE", [item.productId]);
                 const [used] = await conn.execute(`
                     SELECT
@@ -303,8 +323,8 @@ router.post('/order', ensureMembership, async (req, res) => {
                     [userId, userId, item.productId, cycleId]
                 );
                 const available = Math.max(0, Number(pRow[0].stock) - Number(used[0].others));
-                // Se lo stock è stato abbassato dopo l'ordine, il socio può comunque confermare
-                // o ridurre la quantità che aveva già: si blocca solo l'aumento oltre il disponibile.
+                // If the stock was lowered after the order, the member can still confirm or
+                // reduce the quantity already ordered: only an increase beyond availability is blocked.
                 if (item.qty > available && item.qty > Number(used[0].mine)) {
                     stockShortages.push({ productId: item.productId, name: pRow[0].name, requested: item.qty, available });
                 }
@@ -321,8 +341,8 @@ router.post('/order', ensureMembership, async (req, res) => {
             throw err;
         }
 
-        // C. Recupero situazione attuale (Sia Wallet che eventuale Ordine già esistente)
-        // Usiamo 'confirmed' perché in v22.0 l'invio sposta l'ordine da draft a confirmed
+        // C. Current state (both wallet and any existing order)
+        // 'confirmed' because since v22.0 submitting moves the order from draft to confirmed
         const [existing] = await conn.execute(
             "SELECT id, total_amount FROM orders WHERE user_id = ? AND cycle_id = ? AND status = 'confirmed' FOR UPDATE", 
             [userId, cycleId]
@@ -344,12 +364,12 @@ router.post('/order', ensureMembership, async (req, res) => {
             delta = newTotal;
         }
 
-        // D. Controllo Capienza Wallet (Zero-Inference Rule)
+        // D. Wallet capacity check (zero-inference rule)
         if (delta > 0 && currentBalance < delta && !canGoNegative) {
             throw new Error("INSUFFICIENT_FUNDS"); 
         }
 
-        // E. Movimentazione Wallet (Schema v22.0: tipo 'SPESA')
+        // E. Wallet movement (schema v22.0: type 'SPESA')
         if (delta !== 0) {
             await conn.execute(
                 "UPDATE gas_memberships SET balance = balance - ?, updated_at = NOW() WHERE user_id = ? AND gas_id = ?",
@@ -362,7 +382,7 @@ router.post('/order', ensureMembership, async (req, res) => {
             `, [gasId, userId, -delta, existing.length > 0 ? `Aggiornamento Ordine #${orderId}` : `Nuovo Ordine Ciclo #${cycleId}`]);
         }
 
-        // F. Scrittura Ordine (Schema v22.0: status 'confirmed')
+        // F. Write the order (schema v22.0: status 'confirmed')
         if (existing.length > 0) {
             await conn.execute("DELETE FROM order_items WHERE order_id = ?", [orderId]);
             await conn.execute("UPDATE orders SET total_amount = ?, updated_at = NOW() WHERE id = ?", [newTotal, orderId]);
@@ -374,7 +394,7 @@ router.post('/order', ensureMembership, async (req, res) => {
             orderId = resOrder.insertId;
         }
 
-        // G. Scrittura Righe
+        // G. Write the lines
         for (const vItem of validatedItems) {
             await conn.execute(
                 "INSERT INTO order_items (order_id, product_id, quantity, price_at_order) VALUES (?, ?, ?, ?)",
@@ -389,7 +409,7 @@ router.post('/order', ensureMembership, async (req, res) => {
         if (conn) await conn.rollback();
         const businessErrors = ["INSUFFICIENT_FUNDS", "MERCATO_CHIUSO", "QUANTITA_NON_VALIDA", "PRODOTTO_NON_DISPONIBILE"];
         if (err.message.startsWith("STOCK_INSUFFICIENTE")) {
-            // 409: la richiesta è valida ma confligge con quanto già ordinato dagli altri
+            // 409: the request is valid but conflicts with what others have already ordered
             return res.status(409).json({ error: "STOCK_INSUFFICIENTE", message: err.message, details: err.details || [] });
         }
         const status = businessErrors.some(code => err.message.startsWith(code)) ? 400 : 500;
@@ -458,14 +478,14 @@ router.get('/orders/:id', ensureMembership, async (req, res) => {
 
 
 // =============================================================================
-// 5. RICHIESTA DI RICARICA DEL WALLET
+// 5. WALLET TOP-UP REQUEST
 // =============================================================================
 
 /**
  * POST /api/members/wallet/topup-request
- * Il socio dichiara di aver versato una somma (bonifico o contanti): viene creata
- * una transazione in attesa, che il coordinatore approva dalla sua area.
- * Il saldo NON cambia qui: cambia solo con l'approvazione.
+ * The member declares a payment (bank transfer or cash): a pending transaction
+ * is created, which the coordinator approves from their area.
+ * The balance does NOT change here: it changes only on approval.
  */
 router.post('/wallet/topup-request', ensureMembership, async (req, res) => {
     const pool = getDb();
@@ -482,7 +502,7 @@ router.post('/wallet/topup-request', ensureMembership, async (req, res) => {
     }
 
     try {
-        // Una richiesta in attesa alla volta, per non riempire la coda del coordinatore
+        // One pending request at a time, so the coordinator's queue does not fill up
         const [pending] = await pool.execute(
             "SELECT id FROM wallet_transactions WHERE user_id = ? AND gas_id = ? AND status = 'pending' AND type = 'DEPOSIT'",
             [userId, gasId]
@@ -499,7 +519,7 @@ router.post('/wallet/topup-request', ensureMembership, async (req, res) => {
             [gasId, userId, value, note, userId]
         );
 
-        // Avviso al coordinatore, così non deve controllare la pagina a mano
+        // Notify the coordinator, so they do not have to check the page by hand
         try {
             const [user] = await pool.execute("SELECT first_name, last_name FROM users WHERE id = ?", [userId]);
             const who = user.length ? `${user[0].first_name} ${user[0].last_name}` : `utente #${userId}`;
@@ -522,7 +542,7 @@ router.post('/wallet/topup-request', ensureMembership, async (req, res) => {
 
 /**
  * DELETE /api/members/wallet/topup-request/:id
- * Il socio annulla la propria richiesta, finché è ancora in attesa.
+ * The member cancels their own request, while it is still pending.
  */
 router.delete('/wallet/topup-request/:id', ensureMembership, async (req, res) => {
     const pool = getDb();
@@ -541,7 +561,7 @@ router.delete('/wallet/topup-request/:id', ensureMembership, async (req, res) =>
 });
 
 // =============================================================================
-// 6. PROFILO UTENTE
+// 6. USER PROFILE
 // =============================================================================
 
 

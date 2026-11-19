@@ -1,7 +1,27 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * @file backend/routes/public.js
- * @description Gestione rotte pubbliche (contatti e tracking)
- * STATUS: Integro, Completo, Robusto.
+ * @description Public routes (contacts and tracking)
+ * STATUS: Stable.
  */
 const express = require('express');
 const router = express.Router();
@@ -12,7 +32,7 @@ const emailService = require('../emailService');
 router.post('/contact', async (req, res) => {
     const { name, email, location, message } = req.body;
 
-    // Validazione Robustezza
+    // Input validation
     if (!name || !email || !message) {
         return res.status(400).json({ 
             success: false, 
@@ -21,7 +41,7 @@ router.post('/contact', async (req, res) => {
     }
 
     try {
-        // 1. Salvataggio DB (Priorità: Integrità dei dati)
+        // 1. Save to the DB (priority: data integrity)
         const query = `
             INSERT INTO leads (name, email, location, message, status, created_at) 
             VALUES (?, ?, ?, ?, 'NEW', NOW())
@@ -29,8 +49,8 @@ router.post('/contact', async (req, res) => {
         await db.execute(query, [name, email, location || 'N/A', message]);
         console.log(`[Public] Lead salvato nel DB: ${email}`);
 
-        // 2. Invio Notifica Email (Fail-safe: Se fallisce, il processo continua)
-        // SICUREZZA: i campi del form vengono neutralizzati prima di finire nell'HTML
+        // 2. Send the email notification (fail-safe: if it fails, processing continues)
+        // SECURITY: form fields are neutralized before they go into the HTML
         const esc = emailService.escapeHtml;
         const emailSubject = `🔔 Nuovo Contatto da ${String(name).substring(0, 100)}`;
         const emailText = `Nome: ${name}\nEmail: ${email}\nLocalità: ${location || 'Non specificata'}\nMessaggio:\n${message}`;
@@ -43,7 +63,7 @@ router.post('/contact', async (req, res) => {
             <div style="background: #f4f4f4; padding: 15px; border-radius: 8px;">${esc(message).replace(/\n/g, '<br>')}</div>
         `;
 
-        // La notifica va solo all'amministratore: mai al mittente del form (evita abusi come relay di spam)
+        // The notification goes only to the administrator: never to the form sender (prevents abuse as a spam relay)
         const adminEmail = process.env.ADMIN_EMAIL || process.env.EMAIL_ADMIN;
         if (adminEmail) {
             emailService.sendEmail(adminEmail, emailSubject, emailText, emailBody)
@@ -67,9 +87,9 @@ router.post('/contact', async (req, res) => {
 });
 
 // POST /api/public/track
-// Tracciamento visite anonimo con Anti-Spam (6h)
+// Anonymous visit tracking with anti-spam (6h)
 router.post('/track', async (req, res) => {
-    // Risposta immediata (Fire-and-forget)
+    // Immediate response (fire-and-forget)
     res.status(200).json({ success: true });
 
     try {
@@ -90,7 +110,7 @@ router.post('/track', async (req, res) => {
         
         await db.execute(query, [ip, userAgent, ip]);
     } catch (e) {
-        // Fail silently per non sporcare i log di sistema con errori di tracking minori
+        // Fail silently, so minor tracking errors do not clutter the system logs
     }
 });
 

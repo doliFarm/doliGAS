@@ -1,9 +1,29 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * @file frontend/src/components/DebugConsole.jsx
  * @version v1.5.0
  * @author Luigi GRILLO @ doliFarm.com
- * @description On-Screen Debugger potenziato. Intercetta OTP via Eventi (istantaneo) e via API Logs (polling).
- * @status Integro, Completo, Robusto.
+ * @description On-screen debugger. Captures the OTP through events (instant) and through the API logs (polling).
+ * @status Stable
  * @date 2026-02-24
  */
 
@@ -23,7 +43,7 @@ const DebugConsole = () => {
   const [copiedCode, setCopiedCode] = useState(null);
   const scrollRef = useRef(null);
 
-  // --- LOGICA DI ESTRAZIONE OTP ---
+  // --- OTP EXTRACTION LOGIC ---
   const extractOtps = (logsData) => {
     if (!logsData || !Array.isArray(logsData)) return [];
     
@@ -35,13 +55,13 @@ const DebugConsole = () => {
         const match = log.message.match(otpRegex);
         return {
           code: match ? match[0] : null,
-          timestamp: log.timestamp || log.time, // Supporto per log API e log Eventi
+          timestamp: log.timestamp || log.time, // Supports both API logs and event logs
           fullMessage: log.message
         };
       })
       .filter(item => item.code !== null);
 
-    // Deduplicazione per codice
+    // Deduplicate by code
     const uniqueCodesMap = new Map();
     rawCodes.forEach(item => {
       if (!uniqueCodesMap.has(item.code)) {
@@ -56,7 +76,7 @@ const DebugConsole = () => {
   const latestOtp = otps.length > 0 ? otps[0] : null;
   const historyOtps = otps.length > 1 ? otps.slice(1) : [];
 
-  // --- FETCH DATI DAL BACKEND (Log di sistema) ---
+  // --- FETCH DATA FROM THE BACKEND (system logs) ---
   const fetchData = async () => {
     if (APP_CONFIG.APP_ENV !== 'dev') return;
     setIsRefreshing(true);
@@ -68,7 +88,7 @@ const DebugConsole = () => {
       
       const incomingLogs = logRes.data.logs || [];
       
-      // Merge intelligente: manteniamo i log intercettati dal frontend che non sono ancora nei log server
+      // Smart merge: keep the logs captured by the frontend that are not yet in the server logs
       setLogs(prev => {
         const eventLogs = prev.filter(l => l.isEvent);
         const merged = [...eventLogs, ...incomingLogs];
@@ -83,7 +103,7 @@ const DebugConsole = () => {
     }
   };
 
-  // --- LISTENER PER EVENTI ISTANTANEI (Login.jsx) ---
+  // --- LISTENER FOR INSTANT EVENTS (Login.jsx) ---
   useEffect(() => {
     if (APP_CONFIG.APP_ENV !== 'dev') return;
 
@@ -97,13 +117,13 @@ const DebugConsole = () => {
         };
 
         setLogs(prev => [eventLog, ...prev].slice(0, 50));
-        setIsOpen(true); // Apriamo la console per mostrare il codice appena arrivato
-        setActiveTab('OTP'); // Portiamo il focus sul tab corretto
+        setIsOpen(true); // Open the console to show the code that just arrived
+        setActiveTab('OTP'); // Focus the right tab
     };
 
     window.addEventListener('doliGAS_debug_otp', handleDebugOtp);
     
-    // Polling periodico per i log del server (backup)
+    // Periodic polling of the server logs (backup)
     fetchData();
     const interval = setInterval(fetchData, 5000);
 
@@ -121,7 +141,7 @@ const DebugConsole = () => {
 
   if (APP_CONFIG.APP_ENV !== 'dev') return null;
 
-  // --- RENDER PULSANTE CHIUSO ---
+  // --- RENDER CLOSED BUTTON ---
   if (!isOpen) {
     return (
       <button 
@@ -137,7 +157,7 @@ const DebugConsole = () => {
     );
   }
 
-  // --- RENDER WIDGET APERTO ---
+  // --- RENDER OPEN WIDGET ---
   return (
     <div className="fixed bottom-4 right-4 w-80 max-h-[500px] bg-slate-950 text-slate-300 shadow-2xl border border-slate-800 z-[9999] flex flex-col font-mono text-[10px] rounded-2xl animate-in slide-in-from-right duration-300 overflow-hidden">
       

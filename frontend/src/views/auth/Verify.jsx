@@ -1,3 +1,23 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * @file frontend/src/views/auth/Verify.jsx
  * @version v1.0.0
@@ -22,30 +42,30 @@ export const Verify = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Dati passati dalla schermata Login (contact + gasSlug)   *** LG attenzione al demoCode
+  // Data passed by the Login screen (contact + gasSlug)   *** LG mind the demoCode
   const { contact, gasSlug, demoCode } = location.state || {};
 
-  // 1. PROTEZIONE ACCESSO DIRETTO
+  // 1. DIRECT ACCESS PROTECTION
   useEffect(() => {
     if (!contact) {
       navigate('/login', { replace: true });
     }
   }, [contact, navigate]);
 
-  // 2. LOGICA VERIFICA
+  // 2. VERIFICATION LOGIC
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setToast(null);
 
     try {
-      // Step 2: Verifica OTP
+      // Step 2: OTP verification
       const user = await verifyOtp(contact, code);
       
-      // SUCCESSO: Routing basato sul Ruolo
+      // SUCCESS: routing based on the role
       setToast({ type: 'success', message: `Benvenuto ${user.first_name}!` });
       
-      // Ritardo estetico per leggere il messaggio
+      // Cosmetic delay so the message can be read
       setTimeout(() => {
         switch (user.role) {
           case 'Coordinatore':
@@ -57,7 +77,7 @@ export const Verify = () => {
             break;
           case 'Socio':
           default:
-            // Qui indirizziamo alla Nuova App Mobile
+            // Here we send the user to the new mobile app
             navigate('/mobile/home'); 
             break;
         }
@@ -69,11 +89,11 @@ export const Verify = () => {
     }
   };
 
-  // 3. LOGICA RE-INVIO CODICE
+  // 3. CODE RESEND LOGIC
   const handleResend = async () => {
     try {
       setLoading(true);
-      await requestOtp(contact, gasSlug); // Richiama lo Step 1
+      await requestOtp(contact, gasSlug); // Calls step 1 again
       setToast({ type: 'success', message: 'Nuovo codice inviato!' });
     } catch (err) {
       setToast({ type: 'error', message: 'Impossibile rinviare il codice' });
@@ -82,7 +102,7 @@ export const Verify = () => {
     }
   };
 
-  if (!contact) return null; // Evita flash prima del redirect
+  if (!contact) return null; // Avoids a flash before the redirect
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
@@ -112,7 +132,7 @@ export const Verify = () => {
                 maxLength={6}
                 autoFocus
                 value={code}
-                onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, ''))} // Solo numeri
+                onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, ''))} // Digits only
                 className="w-full text-center text-3xl tracking-[0.5em] py-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none font-black text-slate-800 placeholder-slate-200"
                 placeholder="000000"
               />
@@ -137,7 +157,7 @@ export const Verify = () => {
             </button>
           </div>
         </Card>
-            {/* SEZIONE DEBUG/DEMO: Mostra il codice solo se presente nello state */}
+            {/* DEBUG/DEMO SECTION: show the code only if it is in the state */}
         {demoCode && (
           <div className="mt-8 p-4 bg-amber-50 border border-amber-200 rounded-xl shadow-sm animate-pulse flex flex-col items-center justify-center text-center">
              <div className="flex items-center gap-2 text-amber-700 font-bold text-xs uppercase mb-1">

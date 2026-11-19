@@ -1,3 +1,23 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 // src/mockCoordinatorData.js
 
 export const adminConfig = {
@@ -15,8 +35,8 @@ export const adminConfig = {
   }
 };
 
-// SIMULAZIONE LOGISTICA (Aggregato per Prodotto)
-// Questo serve per la fase di CHECK-IN (Furgone)
+// LOGISTICS SIMULATION (aggregated by product)
+// Used for the CHECK-IN phase (van)
 export const logisticsSummary = [
   { 
     id: 'prod1', 
@@ -24,7 +44,7 @@ export const logisticsSummary = [
     producer: 'Az. Rossi', 
     unit: 'kg', 
     qtyOrdered: 100, 
-    qtyReceived: 80, // 20% in meno!
+    qtyReceived: 80, // 20% less!
     price: 1.50,
     status: 'divergent' // ok, divergent, checked
   },
@@ -44,21 +64,21 @@ export const logisticsSummary = [
     producer: 'Il Forno Bio', 
     unit: 'pz', 
     qtyOrdered: 30, 
-    qtyReceived: 28, // Mancano 2 pezzi
+    qtyReceived: 28, // 2 pieces missing
     price: 4.50,
     status: 'divergent'
   }
 ];
 
-// SIMULAZIONE SOCI AL CHECK-OUT (Distribuzione)
-// Dopo il ricalcolo, Marco riceve 8kg invece di 10kg
+// MEMBERS AT CHECK-OUT SIMULATION (distribution)
+// After the recalculation, Marco receives 8 kg instead of 10 kg
 export const membersCheckoutList = [
   {
     id: 'u1',
     name: 'Marco Rossi',
     items: [
       { id: 'prod1', name: 'Arance Tarocco', originalQty: 10, finalQty: 8, unit: 'kg', price: 1.50, status: 'pending' },
-      { id: 'prod3', name: 'Pane Integrale', originalQty: 2, finalQty: 2, unit: 'pz', price: 4.50, status: 'pending' } // Qui l'algoritmo ha deciso di dare i pezzi interi a lui
+      { id: 'prod3', name: 'Pane Integrale', originalQty: 2, finalQty: 2, unit: 'pz', price: 4.50, status: 'pending' } // Here the algorithm decided to give the whole pieces to him
     ],
     totalToPay: 21.00,
     isPaid: false
@@ -68,7 +88,7 @@ export const membersCheckoutList = [
     name: 'Giulia Bianchi',
     items: [
       { id: 'prod1', name: 'Arance Tarocco', originalQty: 5, finalQty: 4, unit: 'kg', price: 1.50, status: 'pending' },
-      { id: 'prod3', name: 'Pane Integrale', originalQty: 1, finalQty: 0, unit: 'pz', price: 4.50, status: 'missing' } // Lei è sfortunata, niente pane
+      { id: 'prod3', name: 'Pane Integrale', originalQty: 1, finalQty: 0, unit: 'pz', price: 4.50, status: 'missing' } // She is unlucky, no bread
     ],
     totalToPay: 6.00,
     isPaid: false
@@ -76,7 +96,7 @@ export const membersCheckoutList = [
 ];
 
 
-// MOCK PERMESSI (Struttura RBAC)
+// PERMISSIONS MOCK (RBAC structure)
 export const availablePermissions = [
   { module: 'catalogo', code: 'product_read', desc: 'Visualizzare listini' },
   { module: 'catalogo', code: 'product_write', desc: 'Creare/Modificare prodotti' },
@@ -111,15 +131,15 @@ export const mockRoles = [
   }
 ];
 
-// MOCK SOCI (Anagrafica Completa)
+// MEMBERS MOCK (full registry)
 export const allMembers = [
   { id: 1, name: 'Marco Rossi', email: 'marco@email.com', role: 'Coordinatore', balance: 15.50, status: 'ACTIVE' },
-  { id: 2, name: 'Giulia Bianchi', email: 'giulia@email.com', role: 'Socio', balance: -5.00, status: 'ACTIVE' }, // In rosso
+  { id: 2, name: 'Giulia Bianchi', email: 'giulia@email.com', role: 'Socio', balance: -5.00, status: 'ACTIVE' }, // In the red
   { id: 3, name: 'Luca Verdi', email: 'luca@email.com', role: 'Volontario Logistica', balance: 42.00, status: 'ACTIVE' },
-  { id: 4, name: 'Anna Neri', email: 'anna@email.com', role: 'Socio', balance: 0.00, status: 'BANNED' }, // Disattivata
+  { id: 4, name: 'Anna Neri', email: 'anna@email.com', role: 'Socio', balance: 0.00, status: 'BANNED' }, // Disabled
 ];
 
-// MOCK RICARICHE PENDENTI (Bonifici da approvare)
+// PENDING TOP-UPS MOCK (bank transfers to approve)
 export const pendingTransactions = [
   { id: 'tx_101', userId: 2, userName: 'Giulia Bianchi', date: '14/01/2026', amount: 50.00, type: 'BONIFICO', ca: 'IT99X...1234' },
   { id: 'tx_102', userId: 5, userName: 'Mario Rossi (Nuovo)', date: '15/01/2026', amount: 20.00, type: 'QUOTA_ISCRIZIONE', ca: 'Contanti' },

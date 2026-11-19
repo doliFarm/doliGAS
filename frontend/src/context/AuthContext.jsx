@@ -1,3 +1,23 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * @file frontend/src/context/AuthContext.jsx
  * @version v1.0.0
@@ -18,7 +38,7 @@ export const AuthProvider = ({ children }) => {
   const [activeProfile, setActiveProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // --- INTERCETTORE PER SESSIONE SCADUTA ---
+  // --- INTERCEPTOR FOR EXPIRED SESSIONS ---
   useEffect(() => {
     const interceptor = axios.interceptors.response.use(
       (response) => response,
@@ -36,7 +56,7 @@ export const AuthProvider = ({ children }) => {
     return () => axios.interceptors.response.eject(interceptor);
   }, []);
 
-  // --- API CHIAMATE ---
+  // --- API CALLS ---
   const requestOtp = async (contact, gasSlug) => {
     try {
       const res = await axios.post('/api/auth/login', { contact, gasSlug });
@@ -80,21 +100,21 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // --- LOGOUT INTELLIGENTE v11.0 ---
+  // --- SMART LOGOUT v11.0 ---
   const logout = () => {
-    // 1. Pulizia Totale
+    // 1. Full cleanup
     setUser(null);
     setActiveProfile(null);
     setProfiles([]);
-    localStorage.clear(); // Pulizia radicale
+    localStorage.clear(); // Thorough cleanup
     delete axios.defaults.headers.common['Authorization'];
 
-    // 2. Calcolo Redirect
+    // 2. Work out the redirect
     const hostname = window.location.hostname;
     const parts = hostname.split('.');
     
-    // Se siamo su un sottodominio (es. demo.dolifarm.com) -> Vai a /auth/login
-    // Se siamo su root o welcome (es. welcome.dolifarm.com) -> Ricarica la pagina (che andrà a Welcome)
+    // On a subdomain (e.g. demo.dolifarm.com) -> go to /auth/login
+    // On the root or welcome (e.g. welcome.dolifarm.com) -> reload the page (which goes to Welcome)
     if (parts.length > 2 && parts[0] !== 'www' && parts[0] !== 'welcome') {
         window.location.href = '/auth/login';
     } else {
@@ -102,7 +122,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // --- REIDRATAZIONE ---
+  // --- REHYDRATION ---
   useEffect(() => {
     const initAuth = () => {
       const token = localStorage.getItem('doliGAS_token');

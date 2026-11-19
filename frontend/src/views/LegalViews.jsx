@@ -1,9 +1,29 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * @file frontend/src/views/LegalViews.jsx
  * @version v2.3
  * @author Luigi GRILLO @ doliFarm.com
- * @description Pagine statiche Privacy e Termini. Supporto i18n integrale per il contenuto.
- * @status Integro, Completo, Robusto.
+ * @description Static Privacy and Terms pages. Full i18n support for the content.
+ * @status Stable
  * @date 2026-02-23
  */
 
@@ -13,7 +33,7 @@ import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Shield, FileText } from 'lucide-react';
 import { Button } from '../components/ui-kit';
 
-// --- 1. CONTENUTI TRADOTTI (Usabili nei Modali e nelle Viste) ---
+// --- 1. TRANSLATED CONTENT (usable in modals and views) ---
 export const PrivacyContent = () => {
   const { t } = useTranslation();
   return (
@@ -49,7 +69,7 @@ export const TermsContent = () => {
   );
 };
 
-// --- 2. LAYOUT PAGINA INTERA ---
+// --- 2. FULL PAGE LAYOUT ---
 const LegalLayout = ({ title, icon: Icon, children }) => {
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -80,7 +100,7 @@ const LegalLayout = ({ title, icon: Icon, children }) => {
   );
 };
 
-// --- 3. EXPORT DELLE VISTE COMPLETE ---
+// --- 3. EXPORT OF THE COMPLETE VIEWS ---
 export const PrivacyView = () => {
   const { t } = useTranslation();
   return (
