@@ -209,11 +209,13 @@ router.get('/', async (req, res) => {
                     WHERE oi.product_id = p.id
                       AND o.cycle_id = ?
                       AND o.status IN ('confirmed', 'processing', 'delivered')
-                ), 0) AS ordered_qty
+                ), 0) AS ordered_qty,
+                s.confirmed_qty
             FROM products p
             JOIN product_units u ON p.unit_id = u.id
             LEFT JOIN product_categories c ON p.category_id = c.id
-            WHERE p.producer_id = ? ORDER BY p.name ASC`, [cycleId || 0, context.producer_id]);
+            LEFT JOIN producer_cycle_supply s ON s.product_id = p.id AND s.cycle_id = ?
+            WHERE p.producer_id = ? ORDER BY p.name ASC`, [cycleId || 0, cycleId || 0, context.producer_id]);
 
         const [units] = await pool.execute("SELECT id, name, symbol FROM product_units ORDER BY name");
         const [categories] = await pool.execute("SELECT id, name FROM product_categories WHERE gas_id = ?", [context.gas_id]);
@@ -402,8 +404,8 @@ router.get('/profile', async (req, res) => {
  * È un endpoint separato da PUT /bulk di proposito: quello modifica il LISTINO e resta
  * bloccato dopo la scadenza G2, mentre questa conferma avviene proprio in quella finestra.
  *
- * La quantità confermata viene scritta in products.stock, che in questo flusso significa
- * "quanto il produttore mette a disposizione per il ciclo in corso".
+ * La quantità confermata viene scritta in producer_cycle_supply, legata al ciclo:
+ * products.stock resta la disponibilità del listino e non viene toccato.
  */
 router.post('/confirm-supply', async (req, res) => {
     const pool = getDb();
@@ -437,11 +439,15 @@ router.post('/confirm-supply', async (req, res) => {
                 if (!Number.isFinite(qty) || qty < 0) {
                     throw new Error(`QUANTITA_NON_VALIDA: prodotto ID ${item.id}`);
                 }
-                const [r] = await conn.execute(
-                    "UPDATE products SET stock = ?, updated_at = NOW(), updated_by = ? WHERE id = ? AND producer_id = ?",
-                    [qty, req.user.id, item.id, context.producer_id]
+                // La SELECT su products garantisce che il prodotto sia di questo produttore.
+                // ON DUPLICATE: una nuova conferma sostituisce la precedente dello stesso ciclo.
+                const [r] = await conn.execute(`
+                    INSERT INTO producer_cycle_supply (cycle_id, product_id, confirmed_qty, confirmed_by)
+                    SELECT ?, p.id, ?, ? FROM products p WHERE p.id = ? AND p.producer_id = ?
+                    ON DUPLICATE KEY UPDATE confirmed_qty = VALUES(confirmed_qty), confirmed_by = VALUES(confirmed_by)`,
+                    [cycles[0].id, qty, req.user.id, item.id, context.producer_id]
                 );
-                updated += r.affectedRows;
+                if (r.affectedRows > 0) updated++;
             }
             await conn.commit();
             res.json({ success: true, updated, cycleId: cycles[0].id });
