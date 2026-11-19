@@ -8,7 +8,7 @@ doliGAS è una web app multi-tenant per i Gruppi di Acquisto Solidale (GAS), con
 - **Flusso di lavoro:** si sviluppa in locale sulla workstation (Docker, `APP_ENV=dev`), si valida sulla VPS demo, e il passaggio avviene via GitHub con pull request. Niente modifiche a mano sul server. Istruzioni in `docs/sviluppo-locale.md`.
 - **Installazione attiva:** https://demo.dolifarm365.com, sul server `www` in `~/doliGAS`.
 - **Attenzione:** il server è una copia del repository con cui si lavora anche a mano. È già capitato che contenesse un commit non pubblicato (`e11eb59`, modifiche al compose e al ProfileSelector). Prima di ogni aggiornamento, controllare là `git status` e `git log origin/main..main`, e pubblicare l'eventuale lavoro locale su un ramo prima di fare `pull`.
-- **Repository:** https://github.com/doliFarm/doliGAS (branch `main`). `origin/main` (commit `d5fcaae`, aprile 2026) coincide con il codice della demo.
+- **Repository:** https://github.com/doliFarm/doliGAS, ramo `main`.
 - **Autore e maintainer:** Luigi Grillo (doliFarm). Lingua di lavoro: italiano.
 
 ## Stack
@@ -26,31 +26,46 @@ doliGAS è una web app multi-tenant per i Gruppi di Acquisto Solidale (GAS), con
 - **Modello wallet (DECISO):** l'importo ordinato **si scala subito all'ordine** (`routes/members.js POST /order`). **Alla consegna si fa il conguaglio** sul peso reale (`routes/admin/logistics.js POST /checkout/deliver`): `SPESA` se costa di più, `REFUND` se costa di meno. Non va mai riaddebitato il totale.
 
 ## Stato (19/11/2026)
-Si lavora sul branch **`stabilizzazione`** (`origin/stabilizzazione`), con una pull request aperta verso `main`. `main` resta allineato a quello che gira sulla demo.
+Tutto il lavoro è in `main` su GitHub: PR #1 (sicurezza, consegna, migrazioni), #3 (integrazione del lavoro fatto a mano sulla demo) e #4 (Fase 2). Non ci sono rami aperti.
 
-Commit:
-1. `d5fcaae` Ultimo commit su `origin/main`, uguale alla demo
-2. `2faa6dc` Fase 0: sicurezza (debug API, OTP fuori dai log, limite tentativi, JWT_SECRET obbligatorio, gasId unico, mercato aperto, lock del listino dopo G2, HTML neutralizzato nelle email)
-3. `8d6d93f` Schema reale della demo in `db/`
-4. `1c8b764` Consegna G7 con conguaglio (prima falliva sempre su `wallet_history`, una tabella inesistente)
-5. `da5a393` + `6a5f671` Questo file e i documenti in `docs/`
-6. `0f9e446` **Fase 1:** migrazioni del database, seed demo, creazione GAS, ripartizione della pesatura
-9. `4f6b6bf`, `2fbfbdd`, `fdfb3f3` **Fase 2** (ramo `fase-2-ciclo`, non ancora unito)
-7. `bd4677d` Merge della PR #1 in `main`
-8. `57718e0` + `7670158` Integrazione delle modifiche fatte a mano sulla demo (ramo `demo-locale`): taratura del compose per la VPS, avvio dell'API a database sano, `nodemon.json`, avviso demo ora dietro `VITE_DEMO_MODE`, traduzioni
+**Sulla demo è in produzione solo fino alla PR #3.** La Fase 2 (`96c579a`) è unita ma **non ancora rilasciata**.
 
-**Nessuna di queste modifiche è ancora in produzione.** Prima di distribuirle sulla demo:
-- `JWT_SECRET` nuovo, di almeno 32 caratteri (`openssl rand -hex 32`); altrimenti il server non parte.
-- Non impostare `ENABLE_DEBUG_API` sulla demo.
-- Al primo avvio il backend registra la 001 come baseline (il database esiste già) e applica solo la 002. Fare comunque un backup del database prima dell'aggiornamento.
-- Per mantenere l'avviso demo sulla demo, aggiungere `VITE_DEMO_MODE=true` al suo `.env`.
+### Rilascio della Fase 2 sulla demo (da fare)
+Lo scheduler, partendo per la prima volta, troverebbe le tappe del ciclo attivo con date passate e mai notificate e le recupererebbe tutte insieme, mandando ai soci avvisi vecchi. Quindi si rilascia con lo scheduler spento, si sopprime l'arretrato, poi lo si accende:
+
+```
+cd ~/doliGAS
+git status && git log origin/main..main      # deve essere vuoto: niente lavoro locale
+echo "SCHEDULER_ENABLED=false" >> .env
+git fetch origin && git merge --ff-only origin/main
+docker compose up -d --build
+docker compose exec gashub-api npm run migrate:status   # deve elencare 003_cycle_events.sql
+docker compose exec -T gashub-db sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE"' \
+  < backend/db/tools/sopprimi-eventi-passati.sql
+sed -i 's/^SCHEDULER_ENABLED=false/SCHEDULER_ENABLED=true/' .env
+docker compose up -d gashub-api
+docker logs --tail=20 gashub-api      # atteso: [SCHEDULER] 🕒 Automazione G1-G7 avviata
+```
+
+### Da provare dall'interfaccia dopo il rilascio
+Quattro flussi nuovi che nessuno ha ancora toccato dal browser:
+- coordinatore: modifica di un ciclo (prima dava 404) e import CSV del catalogo;
+- socio: dichiarazione di una ricarica dal portafoglio, poi approvazione del coordinatore;
+- produttore: pagina Ordini, che prima era sempre vuota (serve un ciclo a mercato chiuso con ordini).
 
 ## Prossimi passi
 Il piano completo è in `docs/piano-stabilizzazione.md`; l'analisi dei problemi (#1–#17) è in `docs/analisi-codice.md`.
-1. ~~**Fase 1, database**~~ ✅ fatta (`0f9e446`). Resta da decidere: le tabelle `permissions`, `role_permissions`, `user_permissions` e `gas_holidays` esistono nello schema ma **non sono usate dal codice** — valorizzarle o rimuoverle con una migrazione.
-2. ~~**Fase 2, ciclo**~~ ✅ fatta (`4f6b6bf`, `2fbfbdd`, `fdfb3f3`): scheduler avviato e idempotente (`cycle_events`, migrazione 003), MOQ corretto, rotazione dei log, `PUT /api/admin/cycles/:id` con validazione delle sette date, `ordered_qty` per il produttore, `POST /api/products/confirm-supply`, import CSV del catalogo, richiesta di ricarica del socio. **Resta:** la gestione dello stock, che non viene né controllato né scalato.
-3. **Fase 3, qualità:** test (Jest + supertest su un DB MySQL di test), validazione degli input, pulizia del codice morto (`routes/contact.js`, `routes/admin/dashboard.js`, `routes/admin/products.js` non montati; i mock nel frontend), proxy Vite (`gashub-backend` → `gashub-api`), `.env.example`, CI.
-4. **Fase 4, connettore Dolibarr opzionale:** campi `external_ref` e `external_source`; configurazione per produttore (il suo Dolibarr: listino in entrata, ordini G5 come ordini cliente) e per GAS (il Dolibarr del GAS: fornitori, ordini fornitore, fatture ai soci); sincronizzazione asincrona tramite una tabella outbox.
+
+Fase 0 (sicurezza), Fase 1 (migrazioni) e Fase 2 (ciclo G1–G7 ed endpoint mancanti) sono fatte. Resta:
+
+1. **Stock** (#15): non viene né controllato quando il socio ordina, né scalato. È l'ultimo pezzo della Fase 2.
+2. **Fase 3, qualità:** test automatici (Jest + supertest su un MySQL di test) del flusso completo — ciclo, listino, validazione, ordine, pesatura, consegna, saldo; validazione degli input con schemi; pulizia del codice morto (`routes/contact.js`, `routes/admin/dashboard.js`, `routes/admin/products.js` non sono montati; mock nel frontend); proxy Vite che punta a `gashub-backend` invece di `gashub-api`; CI minima. Da allineare anche le traduzioni: `it.json` ha 492 chiavi, `en.json` e `fr.json` 435.
+3. **Fase 4, connettore Dolibarr opzionale:** campi `external_ref` e `external_source`; per il produttore il suo Dolibarr (listino in entrata, ordini G5 come ordini cliente), per il GAS il proprio Dolibarr (fornitori, ordini fornitore, fatture ai soci); sincronizzazione asincrona con una tabella outbox.
+
+### Decisioni in sospeso
+- Le tabelle `permissions`, `role_permissions` e `user_permissions` esistono nel database ma nessun codice le usa: erano il disegno di permessi granulari, di cui resta traccia in `frontend/src/mockCoordinatorData.js` (dieci permessi, ruoli personalizzabili come "Volontario Logistica"). Da realizzare o rimuovere con una migrazione.
+- `gas_holidays` è un duplicato mai usato di `holidays`, che è la tabella viva: da rimuovere con una migrazione.
+- **SMTP:** finché `SMTP_HOST` non è configurato gli invii sono simulati e l'accesso dipende da `DEMO_SHOW_OTP`. Configurarlo è la precondizione per aprire la demo a persone esterne, e il momento in cui ricontrollare i destinatari delle notifiche automatiche.
 
 ## Comandi utili (in `backend/`)
 - `npm run migrate` applica le migrazioni mancanti; `npm run migrate:status` mostra lo stato senza modificare nulla.

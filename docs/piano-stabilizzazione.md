@@ -25,7 +25,9 @@ I numeri #n rimandano ai problemi elencati in `analisi-codice.md`.
 
 Si lavora sul branch `stabilizzazione`, con una pull request aperta verso `main`. Nessuna di queste modifiche è ancora in produzione sulla demo.
 
-## Fase 0 — Messa in sicurezza ✅ codice fatto, da distribuire
+> **Dove siamo al 19/11/2026:** Fasi 0, 1 e 2 unite in `main` (PR #1, #3, #4). Sulla demo è rilasciato fino alla PR #3: **la Fase 2 non è ancora in produzione**, e il suo rilascio richiede la sequenza con lo scheduler spento descritta in `CLAUDE.md`. Resta aperta la gestione dello stock, poi la Fase 3.
+
+## Fase 0 — Messa in sicurezza ✅ rilasciata sulla demo
 **Sul server demo (a carico di Luigi):**
 - Bloccare `/api/debug/*` nel reverse proxy finché la nuova versione non è online.
 - Nuovo `JWT_SECRET` di almeno 32 caratteri (`openssl rand -hex 32`), poi riavviare l'API.
