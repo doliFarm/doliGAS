@@ -214,6 +214,22 @@ router.post('/order', ensureMembership, async (req, res) => {
     try {
         await conn.beginTransaction();
 
+        // SICUREZZA: il ciclo deve appartenere al GAS, essere attivo e avere il mercato aperto
+        const [openCycle] = await conn.execute(
+            `SELECT id FROM cycles
+             WHERE id = ? AND gas_id = ? AND is_active = 1
+               AND NOW() >= market_open_at AND NOW() < market_close_at`,
+            [cycleId || 0, gasId]
+        );
+        if (openCycle.length === 0) throw new Error("MERCATO_CHIUSO: il ciclo non è aperto agli ordini.");
+
+        // Validazione quantità (numeri positivi)
+        for (const item of items) {
+            const q = Number(item.qty);
+            if (!Number.isFinite(q) || q <= 0) throw new Error(`QUANTITA_NON_VALIDA: articolo ID ${item.productId}`);
+            item.qty = q;
+        }
+
         // A. Configurazione GAS (Fiducia/Prepagato)
         const [gasConfig] = await conn.execute("SELECT allow_insufficient_balance FROM gas WHERE id = ?", [gasId]);
         const canGoNegative = gasConfig.length > 0 && gasConfig[0].allow_insufficient_balance === 1;
@@ -235,7 +251,8 @@ router.post('/order', ensureMembership, async (req, res) => {
                   AND v.is_validated = 1 
                   AND p.is_active = 1 
                   AND pr.is_active = 1
-            `, [item.productId, cycleId]);
+                  AND pr.gas_id = ?
+            `, [item.productId, cycleId, gasId]);
 
             if (pRow.length === 0) {
                 // Il prodotto non esiste, non è attivo o il produttore non ha validato il listino
@@ -313,7 +330,8 @@ router.post('/order', ensureMembership, async (req, res) => {
 
     } catch (err) {
         if (conn) await conn.rollback();
-        const status = err.message === "INSUFFICIENT_FUNDS" ? 400 : 500; 
+        const businessErrors = ["INSUFFICIENT_FUNDS", "MERCATO_CHIUSO", "QUANTITA_NON_VALIDA", "PRODOTTO_NON_DISPONIBILE"];
+        const status = businessErrors.some(code => err.message.startsWith(code)) ? 400 : 500;
         console.error("[MEMBER_ORDER] Crash:", err.message);
         res.status(status).json({ error: err.message });
     } finally {

@@ -63,7 +63,8 @@ router.get('/checkin/:cycleId', async (req, res) => {
 router.post('/checkin/bulk-update', async (req, res) => {
     const pool = getDb();
     const conn = await pool.getConnection();
-    const { cycleId, items, gasId } = req.body;
+    const { cycleId, items } = req.body;
+    const gasId = req.user.verifiedGasId; // SICUREZZA: mai il gasId del body
     const adminId = req.user.id;
 
     try {
@@ -183,7 +184,8 @@ router.get('/receipt/:orderId', async (req, res) => {
 router.post('/checkout/deliver', async (req, res) => {
     const pool = getDb();
     const conn = await pool.getConnection();
-    const { orderId, gasId } = req.body;
+    const { orderId } = req.body;
+    const gasId = req.user.verifiedGasId; // SICUREZZA: mai il gasId del body
     const adminId = req.user.id;
 
     try {

@@ -20,7 +20,8 @@ const getDb = () => global.pool || require('../../config/db');
 /**
  * Helper interno per estrarre il gasId in modo robusto (Fallback multi-livello).
  */
-const getGasId = (req) => req.user?.verifiedGasId || req.body?.gasId || req.user?.gas_id;
+// SICUREZZA: solo il gasId verificato dal middleware verifyGasMembership
+const getGasId = (req) => req.user?.verifiedGasId;
 
 // =============================================================================
 // MIDDLEWARE DI PROTEZIONE (LOCKOUT PREVENTION)

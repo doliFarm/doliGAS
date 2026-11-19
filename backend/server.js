@@ -8,6 +8,12 @@ const cors = require('cors');
 const morgan = require('morgan');
 require('dotenv').config();
 
+// SICUREZZA: senza un JWT_SECRET robusto il server non deve partire
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+    console.error('[CRITICAL] JWT_SECRET mancante o troppo corto (minimo 32 caratteri). Avvio interrotto.');
+    process.exit(1);
+}
+
 // 1. Inizializzazione Log Buffer (In-Memory per Debug Console)
 global.logBuffer = [];
 const MAX_LOGS = 100;
@@ -67,7 +73,11 @@ app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/members', memberRoutes);
 app.use('/api/admin', adminRoutes); 
-app.use('/api/debug', debugRoutes);
+// SICUREZZA: la Debug API esiste solo se abilitata esplicitamente (mai in produzione)
+if (process.env.ENABLE_DEBUG_API === 'true' && process.env.NODE_ENV !== 'production') {
+    app.use('/api/debug', debugRoutes);
+    console.warn('[SECURITY] Debug API abilitata: da NON usare su istanze pubbliche.');
+}
 app.use('/api/public', publicRoutes);
 
 // Health Check per Docker/LoadBalancer

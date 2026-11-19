@@ -18,7 +18,8 @@ const getDb = () => global.pool || require('../../config/db');
 /**
  * Helper interno per estrarre il gasId in modo robusto da vari contesti
  */
-const getGasId = (req) => req.user?.verifiedGasId || req.body?.gasId || req.user?.gas_id;
+// SICUREZZA: solo il gasId verificato dal middleware verifyGasMembership
+const getGasId = (req) => req.user?.verifiedGasId;
 
 // =============================================================================
 // SEZIONE PRODOTTI (CATALOGO)

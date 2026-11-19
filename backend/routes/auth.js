@@ -14,16 +14,21 @@ const { sendEmail } = require('../emailService');
 
 // Helper DB Dinamico
 const getDb = () => global.pool || require('../config/db');
-const JWT_SECRET = process.env.JWT_SECRET || 'chiave_segreta_super_sicura_123';
+const JWT_SECRET = process.env.JWT_SECRET; // Obbligatorio: verificato all'avvio in server.js
+
+// SICUREZZA: limite tentativi di verifica OTP (anti brute-force, in memoria)
+const MAX_OTP_ATTEMPTS = 5;
+const otpAttempts = new Map(); // userId -> tentativi falliti
 
 // --- 1. LOGIN (Richiesta Codice) ---
 router.post('/login', async (req, res) => {
     const { contact, gasSlug } = req.body;
     const pool = getDb();
-    const isDev = process.env.NODE_ENV === 'development';
+    // Il codice OTP viene restituito nella risposta SOLO con la Debug API abilitata in sviluppo
+    const isDev = process.env.ENABLE_DEBUG_API === 'true' && process.env.NODE_ENV !== 'production';
     
     // LOG SEMPRE ATTIVO PER TRACCIARE L'ARRIVO DELLA RICHIESTA
-    console.log(`[AUTH] 📩 Ricevuta richiesta OTP: contact="${contact}", gasSlug="${gasSlug}"`);
+    console.log(`[AUTH] 📩 Richiesta OTP per il GAS "${gasSlug}"`);
     
     if (!contact || !gasSlug) {
         console.error("[AUTH] ❌ Dati mancanti nella richiesta body");
@@ -42,7 +47,7 @@ router.post('/login', async (req, res) => {
         
         // Se non troviamo nulla, logghiamo il fallimento specifico
         if (checkRows.length === 0) {
-            console.warn(`[AUTH] ⚠️ Nessun utente trovato per "${contact}" nel GAS "${gasSlug}". Controlla i dati nel DB.`);
+            console.warn(`[AUTH] ⚠️ Nessun utente trovato per il contatto indicato nel GAS "${gasSlug}".`);
             return res.json({ success: true, message: 'Se i dati sono corretti, riceverai un codice.' });
         }
 
@@ -62,12 +67,14 @@ router.post('/login', async (req, res) => {
         await pool.execute("INSERT INTO magic_links (user_id, token, expires_at) VALUES (?, ?, ?)", [user.id, code, expiresAt]);
 
         // LOG CRUCIALE: Se vedi questo, il backend ha fatto il suo dovere
-        console.log(`[AUTH] 🔑 OTP GENERATO PER ${user.email}: ${code}`);
+        // SICUREZZA: il codice non va MAI scritto nei log
+        otpAttempts.delete(user.id);
+        console.log(`[AUTH] 🔑 OTP generato per utente #${user.id}`);
         
         // INVIO EMAIL
         try {
             await sendEmail(user.email, `Codice accesso ${user.gas_name}`, `Il tuo codice di accesso doliGAS è: ${code}`);
-            console.log(`[AUTH] 📧 Email inviata con successo a ${user.email}`);
+            console.log(`[AUTH] 📧 Email OTP inviata a utente #${user.id}`);
         } catch (e) {
             console.error(`[AUTH] ❌ Errore invio email: ${e.message}`);
         }
@@ -97,8 +104,20 @@ router.post('/verify', async (req, res) => {
         if (users.length === 0) return res.status(400).json({ error: 'Credenziali non valide' });
         const user = users[0];
 
-        const [links] = await pool.execute("SELECT * FROM magic_links WHERE user_id = ? AND token = ? AND expires_at > NOW()", [user.id, token]);
-        if (links.length === 0) return res.status(400).json({ error: 'Codice errato o scaduto' });
+        const [links] = await pool.execute("SELECT * FROM magic_links WHERE user_id = ? AND token = ? AND expires_at > NOW()", [user.id, String(token || '')]);
+        if (links.length === 0) {
+            // Dopo MAX_OTP_ATTEMPTS tentativi falliti il codice viene invalidato
+            const attempts = (otpAttempts.get(user.id) || 0) + 1;
+            otpAttempts.set(user.id, attempts);
+            if (attempts >= MAX_OTP_ATTEMPTS) {
+                await pool.execute("DELETE FROM magic_links WHERE user_id = ?", [user.id]);
+                otpAttempts.delete(user.id);
+                console.warn(`[AUTH] 🚫 Troppi tentativi OTP per utente #${user.id}: codice invalidato`);
+                return res.status(429).json({ error: 'Troppi tentativi. Richiedi un nuovo codice.' });
+            }
+            return res.status(400).json({ error: 'Codice errato o scaduto' });
+        }
+        otpAttempts.delete(user.id);
 
         const [rawProfiles] = await pool.execute(`
             SELECT 

@@ -17,10 +17,17 @@ const verifyGasMembership = (requiredRole = null) => {
         if (!req.user) return res.status(401).json({ error: 'Autenticazione richiesta' });
 
         // Recuperiamo il gasId inviato dal frontend
-        const gasId = req.query.gasId || req.body.gasId || req.params.gasId;
+        // SICUREZZA: il gasId può arrivare da query, body o params, ma deve essere UNO solo.
+        // Valori diversi tra le fonti vengono rifiutati per impedire l'accesso a un altro GAS.
+        const sources = [req.query?.gasId, req.body?.gasId, req.params?.gasId]
+            .filter(v => v !== undefined && v !== null && v !== '');
+        const gasId = sources[0];
 
         if (!gasId) {
             return res.status(400).json({ error: 'Contesto GAS non specificato (gasId mancante)' });
+        }
+        if (!/^\d+$/.test(String(gasId)) || sources.some(v => String(v) !== String(gasId))) {
+            return res.status(400).json({ error: 'Contesto GAS non valido o incoerente' });
         }
 
         try {
