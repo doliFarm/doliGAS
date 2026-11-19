@@ -25,7 +25,7 @@ I numeri #n rimandano ai problemi elencati in `analisi-codice.md`.
 
 Si lavora sul branch `stabilizzazione`, con una pull request aperta verso `main`. Nessuna di queste modifiche è ancora in produzione sulla demo.
 
-> **Dove siamo al 19/11/2026:** Fasi 0, 1 e 2 unite in `main` (PR #1, #3, #4). Sulla demo è rilasciato fino alla PR #3: **la Fase 2 non è ancora in produzione**, e il suo rilascio richiede la sequenza con lo scheduler spento descritta in `CLAUDE.md`. Lo stock (#15) è fatto sul ramo `stock`; poi la Fase 3.
+> **Dove siamo al 19/11/2026:** Fasi 0, 1 e 2 (stock compreso) unite in `main` (PR #1, #3, #4, #5) e **rilasciate sulla demo**, con le migrazioni 001–004. Prossima: Fase 3.
 
 ## Fase 0 — Messa in sicurezza ✅ rilasciata sulla demo
 **Sul server demo (a carico di Luigi):**
