@@ -46,14 +46,14 @@ jobs:
   frontend:
     name: Build del frontend
     runs-on: ubuntu-latest
+    # Stessa immagine del Dockerfile del frontend: package-lock.json è stato generato
+    # su Alpine e contiene solo il binario musl di Rollup, che su Ubuntu (glibc) manca
+    container: node:18-alpine
     defaults:
       run:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 18
       - run: npm install --no-audit --no-fund
       - name: Le traduzioni sono JSON validi
         run: for f in src/locales/*.json; do node -e "JSON.parse(require('fs').readFileSync('$f','utf8'))" || exit 1; done
