@@ -24,8 +24,14 @@ const otpAttempts = new Map(); // userId -> tentativi falliti
 router.post('/login', async (req, res) => {
     const { contact, gasSlug } = req.body;
     const pool = getDb();
-    // Il codice OTP viene restituito nella risposta SOLO con la Debug API abilitata in sviluppo
-    const isDev = process.env.ENABLE_DEBUG_API === 'true' && process.env.NODE_ENV !== 'production';
+    /**
+     * Istanze dimostrative senza SMTP: il codice viene restituito nella risposta,
+     * perché non c'è nessun altro modo di riceverlo. Il frontend lo mostra nella
+     * console di debug. Vale SOLO con DEMO_SHOW_OTP=true, da non usare mai su
+     * un'installazione reale: chi conosce un indirizzo email potrebbe accedere
+     * come quella persona. Indipendente da ENABLE_DEBUG_API.
+     */
+    const showOtpInResponse = process.env.DEMO_SHOW_OTP === 'true';
     
     // LOG SEMPRE ATTIVO PER TRACCIARE L'ARRIVO DELLA RICHIESTA
     console.log(`[AUTH] 📩 Richiesta OTP per il GAS "${gasSlug}"`);
@@ -81,8 +87,8 @@ router.post('/login', async (req, res) => {
 
         const responseData = { success: true, message: 'Codice inviato.' };
         
-        // Se siamo in DEV, passiamo il codice per la DebugConsole
-        if (isDev) {
+        // Istanza dimostrativa: il codice torna al frontend per la console di debug
+        if (showOtpInResponse) {
             responseData.debug_code = code;
         }
 

@@ -16,5 +16,15 @@ frontend/dist/
 *.log
 npm-debug.log*
 
+# Backup e dump del database (contengono dati personali dei soci: MAI nel repository)
+/*.sql
+backup*.sql
+*.dump
+
+# Artefatti di lavoro
+merged_code_*.txt
+*.BCK
+*.bak
+
 # Sistema
 .DS_Store

@@ -1,0 +1,27 @@
+# =============================================================================
+# doliGAS - sovrascritture per lo sviluppo sulla workstation
+#
+# Il file principale non pubblica porte, perché sulla VPS i container sono
+# raggiunti da un reverse proxy esterno sulla rete proxy_net. In locale invece
+# le porte servono, quindi questo file le espone.
+#
+# Si usa SOLO in locale, nominandolo esplicitamente:
+#   docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+#
+# Non si chiama docker-compose.override.yml di proposito: quel nome verrebbe
+# applicato automaticamente anche sulla VPS, pubblicando porte che là non vanno
+# aperte.
+# =============================================================================
+services:
+  gashub-db:
+    ports:
+      # 3307 sull'host per non scontrarsi con un MySQL già installato
+      - "127.0.0.1:3307:3306"
+
+  gashub-api:
+    ports:
+      - "127.0.0.1:${API_PORT}:${API_PORT}"
+
+  gashub-frontend:
+    ports:
+      - "127.0.0.1:8080:80"

@@ -65,6 +65,12 @@ app.use(cors({
     credentials: true
 }));
 
+// Avviso ripetuto all'avvio: espone i codici di accesso, va usato solo sulle demo
+if (process.env.DEMO_SHOW_OTP === 'true') {
+    console.warn('[SECURITY] ⚠️ DEMO_SHOW_OTP attivo: il codice di accesso viene restituito');
+    console.warn('[SECURITY] ⚠️ nella risposta di login. Solo per istanze dimostrative con dati finti.');
+}
+
 app.use(express.json({ limit: '10mb' }));
 app.use(morgan('dev'));
 
@@ -73,8 +79,12 @@ app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/members', memberRoutes);
 app.use('/api/admin', adminRoutes); 
+// In questo progetto NODE_ENV vale quanto APP_ENV ('dev' o 'prod'), quindi
+// non basta confrontarlo con 'production'
+const isProduction = ['prod', 'production'].includes(process.env.NODE_ENV);
+
 // SICUREZZA: la Debug API esiste solo se abilitata esplicitamente (mai in produzione)
-if (process.env.ENABLE_DEBUG_API === 'true' && process.env.NODE_ENV !== 'production') {
+if (process.env.ENABLE_DEBUG_API === 'true' && !isProduction) {
     app.use('/api/debug', debugRoutes);
     console.warn('[SECURITY] Debug API abilitata: da NON usare su istanze pubbliche.');
 }

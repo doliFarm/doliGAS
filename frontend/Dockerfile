@@ -14,6 +14,11 @@ CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "80"]
 
 # --- BUILD STAGE ---
 FROM base as build
+# Le variabili VITE_* vengono lette da Vite durante la build: nel target prod
+# il risultato è statico, quindi devono arrivare qui come build args (non a runtime)
+ARG VITE_API_URL
+ARG VITE_APP_ENV
+ARG VITE_DEMO_MODE
 COPY . .
 RUN npm run build
 

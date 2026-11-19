@@ -1,4 +1,9 @@
 {
+  "demo_popup": {
+    "title": "Bienvenue dans la version Démo de doliGAS !",
+    "message": "<b>Qu'est-ce que c'est</b> : Il s'agit d'une instance de démonstration.\n\n<b>À quoi s'attendre :</b> Certaines fonctionnalités (ex. paiements réels et messagerie) sont désactivées.\n\n<b>Aidez-nous à grandir :</b> Chaque retour de votre part compte pour nous. Vous avez des questions ou des suggestions ? Contactez-nous à info@dolifarm.com.",
+    "btn_continue": "J'ai compris, continuer"
+  },
   "common": {
     "save": "Enregistrer",
     "save_changes": "Enregistrer les modifications",
@@ -378,7 +383,7 @@
     "request_demo_text": "Demander les codes Démo à",
     "support_email": "info@dolifarm.com"
   },
- "welcome_page": {
+  "welcome_page": {
     "hero_badge": "Le Numérique au Service de la Communauté",
     "hero_title": "Votre Groupe d'achat solidaire (GAS), enfin simple",
     "hero_subtitle": "Libérez-vous d'Excel, de WhatsApp et de la confusion. doliGAS est la plateforme éthique qui fait gagner du temps aux Coordinateurs et rapproche les Producteurs",
@@ -459,5 +464,10 @@
     "mod_doligas": "Pour le GAS (doliGAS)",
     "form_location_placeholder": "Ville",
     "program_pioneer": "Programme Pioneer : 3/10 postes pourvus"
-}
+  },
+  "profile_selector": {
+    "welcome_back": "Bon retour",
+    "select_profile_subtitle": "Choisissez le profil avec lequel vous souhaitez travailler aujourd'hui",
+    "back_home": "Se déconnecter et revenir à l'accueil"
+  }
 }

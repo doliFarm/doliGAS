@@ -1,4 +1,9 @@
 {
+  "demo_popup": {
+    "title": "Benvenuto nella versione Demo di doliGAS!",
+    "message": "<b>Cos'è</b>: Questa è un'istanza dimostrativa.\n\n<b>Cosa aspettarsi:</b> Alcune funzionalità (es. pagamenti, messaggistica, foto del catalogo prodotti, import ed export dei dati) sono disattivate. Le prestazioni potrebbero essere ridotte.\n\n<b>Aiutaci a crescere:</b> Ogni tuo feedback per noi conta. Hai domande o suggerimenti? Contattaci a info@dolifarm.com.",
+    "btn_continue": "Ho capito, continua"
+  },
   "common": {
     "save": "Salva",
     "save_changes": "Salva Modifiche",
@@ -367,7 +372,7 @@
     "states": {
       "ORDERS_RECEIVED": "Ordini Ricevuti",
       "LIST_OPEN": "Richiesta Listino",
-      "WAITING": "In attesa degli ordini" 
+      "WAITING": "In attesa degli ordini"
     },
     "messages": {
       "ORDERS_RECEIVED": "Gli ordini sono chiusi. Puoi iniziare a preparare i prodotti.",
@@ -504,7 +509,7 @@
     "mod_dolitrace": "Trasparenza Totale (doliTRACE)",
     "mod_dolifarm": "Per il Produttore (doliFARM)",
     "mod_doligas": "Per il GAS (doliGAS)",
-    "program_pioneer": "Programma Pionieri: 3/10 Posti Occupati" 
+    "program_pioneer": "Programma Pionieri: 3/10 Posti Occupati"
   },
   "email": {
     "otp": {
@@ -534,5 +539,10 @@
       "responsibility_title": "3. Responsabilità",
       "responsibility_text": "doliGAS è una piattaforma tecnologica. La responsabilità sulla qualità dei prodotti ricade sui singoli Produttori."
     }
+  },
+  "profile_selector": {
+    "welcome_back": "Bentornato",
+    "select_profile_subtitle": "Seleziona con quale profilo vuoi operare oggi",
+    "back_home": "Esci e torna alla home"
   }
 }

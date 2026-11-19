@@ -1,4 +1,9 @@
 {
+  "demo_popup": {
+    "title": "Welcome to the doliGAS Demo version!",
+    "message": "<b>What it is</b>: This is a demonstration instance.\n\n<b>What to expect:</b> Some features (e.g., real payments and messaging) are disabled.\n\n<b>Help us grow:</b> Your feedback matters to us. Do you have questions or suggestions? Contact us at info@dolifarm.com.",
+    "btn_continue": "I understand, continue"
+  },
   "common": {
     "save": "Save",
     "save_changes": "Save Changes",
@@ -459,5 +464,10 @@
     "mod_doligas": "For the Group (doliGAS)",
     "form_location_placeholder": "location",
     "program_pioneer": "Pioneer Program: 3/10 Positions Filled"
- }
+  },
+  "profile_selector": {
+    "welcome_back": "Welcome back",
+    "select_profile_subtitle": "Choose which profile you want to use today",
+    "back_home": "Sign out and go back home"
+  }
 }
