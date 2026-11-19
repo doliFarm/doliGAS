@@ -22,6 +22,11 @@ services:
       - ./mysql-data:/var/lib/mysql
       # Non contiene più lo schema: le tabelle sono create dalle migrazioni del backend
       - ./mysql-init:/docker-entrypoint-initdb.d
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - internal_net
     deploy:
@@ -63,6 +68,7 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       ENABLE_DEBUG_API: ${ENABLE_DEBUG_API:-false}
       DEMO_SHOW_OTP: ${DEMO_SHOW_OTP:-false}
+      SCHEDULER_ENABLED: ${SCHEDULER_ENABLED:-true}
       NODE_ENV: ${APP_ENV}
       APP_ENV: ${APP_ENV}
     depends_on:
@@ -71,6 +77,11 @@ services:
     volumes:
       - ./backend:/app
       - /app/node_modules
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - internal_net
       - proxy_net
@@ -114,6 +125,11 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - proxy_net
     deploy:

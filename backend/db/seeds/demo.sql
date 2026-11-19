@@ -102,6 +102,13 @@ INSERT INTO wallet_transactions (gas_id, user_id, amount, type, status, descript
 -- Una ricarica in attesa di approvazione del coordinatore
 (1, 9, 50.00, 'DEPOSIT', 'pending', 'Bonifico in arrivo', NOW() - INTERVAL 1 DAY, 9);
 
+-- Template delle notifiche automatiche (come li crea create-gas.js per un GAS nuovo)
+INSERT INTO notification_templates (gas_id, event_key, subject, body) VALUES
+(1, 'G1_OPEN', 'Apertura Listini - {{cycle_name}}', 'Ciao, è aperta la fase di aggiornamento listini per il ciclo {{cycle_name}}. Hai tempo fino al {{deadline}}.'),
+(1, 'G3_SHOP_OPEN', 'Mercato Aperto! 🛒', 'Cari soci, il mercato per {{cycle_name}} è aperto. Chiusura prevista: {{close_date}}.'),
+(1, 'G4_REMINDER', '⏳ 3 Ore alla Chiusura', 'Affrettati! Il mercato per {{cycle_name}} chiude tra 3 ore. Controlla il tuo carrello.'),
+(1, 'G5_PROD_ORDER', 'Nuovi Ordini da Preparare 📦', 'Gli ordini per {{cycle_name}} sono confermati. Accedi alla dashboard per scaricare la lista di preparazione.');
+
 -- Notifiche di esempio
 INSERT INTO notifications (gas_id, user_id, target_profile, title, message, type, is_read) VALUES
 (1, 6, 'member', 'Benvenuta in doliGAS!', 'Il mercato del ciclo in corso è aperto. Buona spesa!', 'success', 0),
