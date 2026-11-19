@@ -35,6 +35,7 @@ Commit:
 4. `1c8b764` Consegna G7 con conguaglio (prima falliva sempre su `wallet_history`, una tabella inesistente)
 5. `da5a393` + `6a5f671` Questo file e i documenti in `docs/`
 6. `0f9e446` **Fase 1:** migrazioni del database, seed demo, creazione GAS, ripartizione della pesatura
+9. `4f6b6bf`, `2fbfbdd`, `fdfb3f3` **Fase 2** (ramo `fase-2-ciclo`, non ancora unito)
 7. `bd4677d` Merge della PR #1 in `main`
 8. `57718e0` + `7670158` Integrazione delle modifiche fatte a mano sulla demo (ramo `demo-locale`): taratura del compose per la VPS, avvio dell'API a database sano, `nodemon.json`, avviso demo ora dietro `VITE_DEMO_MODE`, traduzioni
 
@@ -47,11 +48,7 @@ Commit:
 ## Prossimi passi
 Il piano completo è in `docs/piano-stabilizzazione.md`; l'analisi dei problemi (#1–#17) è in `docs/analisi-codice.md`.
 1. ~~**Fase 1, database**~~ ✅ fatta (`0f9e446`). Resta da decidere: le tabelle `permissions`, `role_permissions`, `user_permissions` e `gas_holidays` esistono nello schema ma **non sono usate dal codice** — valorizzarle o rimuoverle con una migrazione.
-2. **Fase 2, ciclo:**
-   - lo scheduler (`cron/scheduler.js`) non viene mai avviato: va avviato e reso idempotente con una tabella degli eventi inviati per ciclo; il controllo MOQ usa `status='pending'`, che non esiste;
-   - endpoint mancanti: `PUT /api/admin/cycles/:id`, `POST /api/admin/catalog/validate` e `/bulk-import`, ordini del produttore (la pagina legge `ordered_qty`, che non esiste), richiesta di ricarica del socio;
-   - stock;
-   - arrotondamento delle unità discrete nella pesatura.
+2. ~~**Fase 2, ciclo**~~ ✅ fatta (`4f6b6bf`, `2fbfbdd`, `fdfb3f3`): scheduler avviato e idempotente (`cycle_events`, migrazione 003), MOQ corretto, rotazione dei log, `PUT /api/admin/cycles/:id` con validazione delle sette date, `ordered_qty` per il produttore, `POST /api/products/confirm-supply`, import CSV del catalogo, richiesta di ricarica del socio. **Resta:** la gestione dello stock, che non viene né controllato né scalato.
 3. **Fase 3, qualità:** test (Jest + supertest su un DB MySQL di test), validazione degli input, pulizia del codice morto (`routes/contact.js`, `routes/admin/dashboard.js`, `routes/admin/products.js` non montati; i mock nel frontend), proxy Vite (`gashub-backend` → `gashub-api`), `.env.example`, CI.
 4. **Fase 4, connettore Dolibarr opzionale:** campi `external_ref` e `external_source`; configurazione per produttore (il suo Dolibarr: listino in entrata, ordini G5 come ordini cliente) e per GAS (il Dolibarr del GAS: fornitori, ordini fornitore, fatture ai soci); sincronizzazione asincrona tramite una tabella outbox.
 
@@ -72,6 +69,8 @@ In locale i container si avviano con `docker compose -f docker-compose.yml -f do
 - **Migrazioni:** mai modificare un file già applicato (il checksum viene confrontato e la differenza segnalata); aggiungere sempre un nuovo file col numero successivo. In MySQL il DDL non è transazionale, quindi tenere ogni migrazione piccola.
 - **Accesso senza SMTP:** la demo e l'ambiente locale non inviano email, quindi il codice di accesso torna nella risposta di login e il frontend lo mostra nella console di debug in basso a destra. Serve `DEMO_SHOW_OTP=true` nel `.env`, e per vedere la console serve `APP_ENV=dev`. Con quell'opzione attiva chiunque conosca un indirizzo email può entrare come quella persona: va spenta appena c'è SMTP, e non va mai usata su un'installazione reale.
 - **Traduzioni:** `it.json` ha 492 chiavi, `en.json` e `fr.json` 435: a inglese e francese ne mancano 57, da allineare (Fase 3).
+- **Scheduler:** gli eventi inviati sono in `cycle_events`. Per far ripartire una notifica basta togliere la sua riga; spostando in avanti una data del ciclo, `PUT /api/admin/cycles/:id` lo fa da solo.
+- **Due endpoint distinti per il produttore:** `PUT /api/products/bulk` modifica il listino e si blocca dopo G2; `POST /api/products/confirm-supply` conferma le quantità da consegnare e vale solo fra chiusura del mercato e consegna. Non confonderli.
 - La ripartizione della pesatura usa `utils/allocation.js` (metodo dei resti maggiori): la somma delle quote è esattamente il totale ricevuto e le unità discrete restano numeri interi.
 
 ## Convenzioni
