@@ -1,3 +1,23 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * @file frontend/src/views/producer/ProducerEditor.jsx
  * @version v1.0.0
@@ -27,34 +47,34 @@ export const ProducerEditor = () => {
   const [isLocked, setIsLocked] = useState(false);
   const { t } = useTranslation();
   const { activeProfile } = useAuth();
-  // Stati UI
+  // UI state
   const [searchTerm, setSearchTerm] = useState('');
   const [saving, setSaving] = useState(false); // Bulk Save
   const [changes, setChanges] = useState({}); // Bulk Changes
   const [toast, setToast] = useState(null);
   
-  // Stati Modale CRUD
+  // CRUD modal state
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null); // null = new
   const [modalLoading, setModalLoading] = useState(false);
 
-  // Stati validazione listino 
+  // Price list validation state
   const [isValidated, setIsValidated] = useState(false);
   const [validating, setValidating] = useState(false);
-  const [cycleId, setCycleId] = useState(null); // Necessario per la validazione
+  const [cycleId, setCycleId] = useState(null); // Needed for the validation
 
-  // --- FETCH DATI ---
+  // --- DATA FETCH ---
   const fetchData = async () => {
     try {
       setLoading(true);
       const res = await axios.get('/api/products');
       
-      // MAPPIAMO I DATI DAL BACKEND
+      // MAP THE DATA FROM THE BACKEND
       setProducts(res.data.products || []);
       setUnits(res.data.units || []);
       setCategories(res.data.categories || []);
       
-      // IMPORTANTE: Questi tre devono esserci per far apparire il bottone
+      // IMPORTANT: these three must be present for the button to appear
       setIsLocked(res.data.isListLocked || false);
       setIsValidated(res.data.isValidated || false);
       setCycleId(res.data.cycleId || null);
@@ -83,7 +103,7 @@ export const ProducerEditor = () => {
 
   const handleBulkSave = async () => {
     if (isLocked) return;
-/* richiesta conferma se già validato
+/* ask for confirmation if already validated
     if (isValidated) {
         if (!window.confirm(t('producer_dash.editor.warn_revoke', "Attenzione: salvando queste modifiche, il listino perderà lo stato di 'Validato' e dovrai confermarlo nuovamente. Vuoi procedere?"))) {
             return;
@@ -156,7 +176,7 @@ export const ProducerEditor = () => {
   const handleValidate = async () => {
     if (isLocked || validating || !cycleId) return;
     
-    // Controllo di sicurezza aggiuntivo
+    // Additional safety check
     if (!activeProfile?.context_id) {
         setToast({ type: 'error', message: 'Errore: ID Produttore mancante' });
         return;
@@ -165,7 +185,7 @@ export const ProducerEditor = () => {
     setValidating(true);
     try {
       await axios.post('/api/products/validate-list', {
-        producerId: activeProfile.context_id, // <-- MODIFICATO: Ora passiamo l'ID reale
+        producerId: activeProfile.context_id, // <-- CHANGED: now the real id is passed
         cycleId: cycleId
       });
       
@@ -179,7 +199,7 @@ export const ProducerEditor = () => {
     }
   };
 
-  // --- PREPARAZIONE DATI PER IL RENDER ---
+  // --- DATA PREPARATION FOR RENDERING ---
   const filtered = products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
   const changesCount = Object.keys(changes).length;
 
@@ -190,8 +210,8 @@ export const ProducerEditor = () => {
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
       {/* =========================================================
-          1. HEADER FISSO (Ricerca, Valida, Nuovo, Salva Massivo) 
-          ========================================================= */}
+         1. FIXED HEADER (search, validate, new, bulk save)
+         ========================================================= */}
       <div className="sticky top-0 bg-slate-50/95 backdrop-blur z-20 py-3 space-y-3 border-b border-slate-200 px-1">
         
         {isLocked && (
@@ -200,7 +220,7 @@ export const ProducerEditor = () => {
             </div>
         )}
 
-        {/* RIGA A: Ricerca + Azioni (Flex Layout) */}
+        {/* ROW A: search + actions (flex layout) */}
         <div className="flex flex-col sm:flex-row items-center gap-3">
             <div className="relative w-full sm:w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16}/>
@@ -240,7 +260,7 @@ export const ProducerEditor = () => {
             </div>
         </div>
 
-        {/* RIGA B: Bottone Salvataggio Massivo */}
+        {/* ROW B: bulk save button */}
         {!isLocked && (
             <Button 
               onClick={handleBulkSave} 
@@ -260,15 +280,15 @@ export const ProducerEditor = () => {
       </div>
 
       {/* =========================================================
-          2. LISTA PRODOTTI (Ciclo Unico)
-          ========================================================= */}
+         2. PRODUCT LIST (single loop)
+         ========================================================= */}
       <div className="space-y-4 px-1">
         {filtered.map(p => {
           const current = changes[p.id] || p;
           return (
             <Card key={p.id} className={`p-4 border-l-4 ${current.is_active ? 'border-l-emerald-500' : 'border-l-slate-300 opacity-75'} relative`}>
               
-              {/* Intestazione singola Card */}
+              {/* Single card header */}
               <div className="flex justify-between items-start mb-3">
                 <div className="pr-16">
                   <h3 className="font-bold text-slate-800">{p.name}</h3>
@@ -278,7 +298,7 @@ export const ProducerEditor = () => {
                   </div>
                 </div>
                 
-                {/* Bottoni Edit/Delete singola Card */}
+                {/* Single card Edit/Delete buttons */}
                 {!isLocked && (
                     <div className="absolute top-4 right-4 flex gap-1">
                         <button onClick={() => handleEditClick(p)} className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors">
@@ -291,7 +311,7 @@ export const ProducerEditor = () => {
                 )}
               </div>
 
-              {/* Form campi massivi singola Card */}
+              {/* Single card bulk fields form */}
               <div className="grid grid-cols-4 gap-2 items-end">
                 <div className="col-span-1 text-center">
                   <label className="text-[9px] font-black text-slate-400 uppercase block mb-1">Prezzo</label>
@@ -318,8 +338,8 @@ export const ProducerEditor = () => {
       </div>
 
       {/* =========================================================
-          3. MODALE EDIT/CREATE
-          ========================================================= */}
+         3. EDIT/CREATE MODAL
+         ========================================================= */}
       <Modal 
         isOpen={showModal} 
         onClose={() => setShowModal(false)} 

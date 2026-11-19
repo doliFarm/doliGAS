@@ -1,10 +1,30 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * @file backend/routes/admin/settings.js
  * @version v1.2.0
  * @author Luigi GRILLO @ doliFarm.com
- * @description GAS Configuration API. Gestione Info Generali, Regole operative (Pagamenti, Ordini, Consegne), 
- * Categorie Prodotti e Template Notifiche.
- * @status Integro, Completo, Robusto.
+ * @description GAS Configuration API. General info, operating rules (payments, orders, deliveries),
+ * product categories and notification templates.
+ * @status Stable
  * @date 2026-02-24
  */
 
@@ -12,11 +32,11 @@ const express = require('express');
 const router = express.Router();
 const getDb = () => global.pool || require('../../config/db');
 
-// --- 1. INFO E REGOLE GAS ---
+// --- 1. GAS INFO AND RULES ---
 
 /**
  * GET /api/admin/settings/gas-info
- * Recupera tutte le configurazioni del GAS corrente, inclusi i nuovi flag operativi.
+ * Loads all the settings of the current GAS, including the new operating flags.
  */
 router.get('/gas-info', async (req, res) => {
     const pool = getDb();
@@ -38,7 +58,7 @@ router.get('/gas-info', async (req, res) => {
         
         const data = rows[0];
 
-        // ROBUSTEZZA: Conversione esplicita in boolean per prevenire bug nel frontend
+        // Explicit conversion to boolean to prevent frontend bugs
         data.allow_insufficient_balance = !!data.allow_insufficient_balance;
         data.manage_payments = !!data.manage_payments;
         data.manage_orders = !!data.manage_orders;
@@ -53,7 +73,7 @@ router.get('/gas-info', async (req, res) => {
 
 /**
  * POST /api/admin/settings/gas-info
- * Aggiorna le anagrafiche e le modalità operative del GAS.
+ * Updates the GAS details and operating modes.
  */
 router.post('/gas-info', async (req, res) => {
     const pool = getDb();
@@ -87,11 +107,11 @@ router.post('/gas-info', async (req, res) => {
     }
 });
 
-// --- 2. CATEGORIE PRODOTTI ---
+// --- 2. PRODUCT CATEGORIES ---
 
 /**
  * GET /api/admin/settings/categories
- * Recupera l'elenco delle categorie associate al GAS corrente.
+ * Lists the categories of the current GAS.
  */
 router.get('/categories', async (req, res) => {
     const pool = getDb();
@@ -109,7 +129,7 @@ router.get('/categories', async (req, res) => {
 
 /**
  * POST /api/admin/settings/categories
- * Crea o aggiorna una categoria (Upsert).
+ * Creates or updates a category (upsert).
  */
 router.post('/categories', async (req, res) => {
     const pool = getDb();
@@ -137,7 +157,7 @@ router.post('/categories', async (req, res) => {
 
 /**
  * DELETE /api/admin/settings/categories/:id
- * Eliminazione categoria con controllo di integrità referenziale sui prodotti.
+ * Deletes a category, checking referential integrity on products.
  */
 router.delete('/categories/:id', async (req, res) => {
     const pool = getDb();
@@ -145,7 +165,7 @@ router.delete('/categories/:id', async (req, res) => {
     const categoryId = req.params.id;
 
     try {
-        // Verifica se ci sono prodotti associati (Integrità Referenziale)
+        // Check whether products are linked to it (referential integrity)
         const [products] = await pool.execute(
             "SELECT id FROM products WHERE category_id = ? LIMIT 1",
             [categoryId]
@@ -167,11 +187,11 @@ router.delete('/categories/:id', async (req, res) => {
     }
 });
 
-// --- 3. TEMPLATES NOTIFICHE ---
+// --- 3. NOTIFICATION TEMPLATES ---
 
 /**
  * GET /api/admin/settings/templates
- * Recupera i testi personalizzati per le email automatiche del GAS.
+ * Loads the custom texts for the GAS automatic emails.
  */
 router.get('/templates', async (req, res) => {
     const pool = getDb();
@@ -189,7 +209,7 @@ router.get('/templates', async (req, res) => {
 
 /**
  * POST /api/admin/settings/templates
- * Salva massivamente i template notifiche con gestione transazionale.
+ * Saves the notification templates in bulk, in a transaction.
  */
 router.post('/templates', async (req, res) => {
     const pool = getDb();

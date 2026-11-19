@@ -1,8 +1,28 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * @file frontend/src/views/producer/ProducerDashboard.jsx
  * @version v1.1.3
- * @description Dashboard Produttore. Fix segregazione messaggi e risoluzione ReferenceError 'data'.
- * STATUS: Integro, Completo, Robusto.
+ * @description Producer dashboard. Fix for message segregation and the 'data' ReferenceError.
+ * STATUS: Stable.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -21,7 +41,7 @@ export const ProducerDashboard = () => {
   const navigate = useNavigate();
   const { activeProfile } = useAuth();
   
-  // Utilizziamo 'status' come unica fonte di verità per coerenza con il resto del file
+  // 'status' is the single source of truth, consistent with the rest of the file
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -35,7 +55,7 @@ export const ProducerDashboard = () => {
     try {
       setLoading(true);
       setError(false);
-      // La chiamata recupera 'messages' già filtrati per target_profile = 'producer'
+      // The call returns 'messages' already filtered by target_profile = 'producer'
       const res = await axios.get(`/api/products/dashboard-status?producerId=${activeProfile.context_id}`);
       setStatus(res.data);
     } catch (err) {
@@ -59,7 +79,7 @@ export const ProducerDashboard = () => {
       });
       
       setToast({ type: 'success', message: t('producer.validation_success', 'Listino validato con successo!') });
-      fetchStatus(); // Ricarica i dati per mostrare il badge verde
+      fetchStatus(); // Reload the data to show the green badge
     } catch (err) {
       console.error("Errore validazione:", err);
       setToast({ type: 'error', message: 'Impossibile validare il listino' });
@@ -67,18 +87,18 @@ export const ProducerDashboard = () => {
   };
 
   const handleDismissMessage = async (msgId) => {
-    // 1. Optimistic UI Update: Rimuove istantaneamente il messaggio visivamente
+    // 1. Optimistic UI update: removes the message from the view immediately
     setStatus(prev => ({
       ...prev,
       messages: prev.messages.filter(m => m.id !== msgId)
     }));
 
-    // 2. Chiamata API in background
+    // 2. API call in the background
     try {
       await axios.patch(`/api/products/messages/${msgId}/read`);
     } catch (err) {
       console.error("Errore chiusura messaggio:", err);
-      // In caso di errore silente, al prossimo refresh riapparirà
+      // On a silent error, it will show up again at the next refresh
     }
   };
 
@@ -110,7 +130,7 @@ export const ProducerDashboard = () => {
     );
   }
 
-  // --- LOGICA UI DINAMICA ---
+  // --- DYNAMIC UI LOGIC ---
   let HeroIcon = Clock; 
   let heroColor = 'bg-slate-100 text-slate-500';
   let actionBtn = null;
@@ -130,15 +150,15 @@ export const ProducerDashboard = () => {
     case 'MARKET_OPEN':
       HeroIcon = ShoppingBag;
       heroColor = 'bg-blue-100 text-blue-700';
-      // Nessun bottone: il produttore attende che i soci finiscano di comprare
+      // No button: the producer waits for the members to finish shopping
       break;
     case 'WAITING':
     case 'MARKET_CLOSED':
       HeroIcon = Clock;
       heroColor = 'bg-amber-100 text-amber-700';
-      // Nessun bottone: i soci hanno finito, il coordinatore sta per inviare gli ordini
+      // No button: the members are done, the coordinator is about to send the orders
       break;
-    case 'ORDERS_RECEIVED': // FASE G5: Ordini inviati al fornitore
+    case 'ORDERS_RECEIVED': // PHASE G5: orders sent to the supplier
       HeroIcon = ClipboardList;
       heroColor = 'bg-emerald-100 text-emerald-700';
       actionBtn = (
@@ -156,7 +176,7 @@ export const ProducerDashboard = () => {
     <div className="space-y-8 animate-in fade-in duration-500 pb-10">
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       
-      {/* 1. HERO STATUS CARD (Pannello Unificato) */}
+      {/* 1. HERO STATUS CARD (unified panel) */}
       <div className="bg-white rounded-[2rem] p-8 border border-slate-100 shadow-xl shadow-slate-200/50 relative overflow-hidden">
         <div className={`absolute top-0 right-0 p-32 ${heroColor.split(' ')[0]} rounded-full blur-[80px] -translate-y-1/2 translate-x-1/2 opacity-30`}></div>
         
@@ -173,7 +193,7 @@ export const ProducerDashboard = () => {
             {t(`producer_dash.messages.${status.state}`)}
           </p>
           
-          {/* SCADENZA: Visibile SOLO durante il G1/G2 */}
+          {/* DEADLINE: visible ONLY during G1/G2 */}
           {currentState === 'LIST_OPEN' && status.deadline && (
             <div className="flex items-center gap-2 bg-slate-50 px-5 py-2.5 rounded-xl text-xs font-black text-slate-600 border border-slate-200 shadow-sm uppercase">
               <Calendar size={16} className="text-amber-500"/> 
@@ -181,14 +201,14 @@ export const ProducerDashboard = () => {
             </div>
           )}
 
-          {/* TIMELINE FASI SUCCESSIVE: Visibile SOLO DOPO la chiusura listino */}
+          {/* TIMELINE OF THE NEXT PHASES: visible ONLY AFTER the price list closes */}
           {currentState !== 'LIST_OPEN' && currentState !== 'NO_CYCLE' && (
             <div className="w-full max-w-lg mt-2 bg-slate-50/50 rounded-2xl p-6 border border-slate-100/50">
               <div className="flex flex-col sm:flex-row justify-center gap-8 sm:gap-16 relative">
-                {/* Linea di connessione orizzontale */}
+                {/* Horizontal connecting line */}
                 <div className="hidden sm:block absolute top-5 left-1/4 right-1/4 h-0.5 bg-slate-200 -translate-y-1/2 z-0"></div>
 
-                {/* FASE G3: Ordini Soci */}
+                {/* PHASE G3: member orders */}
                 <div className="relative z-10 flex flex-col items-center text-center">
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 border-4 border-white shadow-sm transition-all duration-500 ${
                     (currentState === 'WAITING' || currentState === 'MARKET_OPEN') 
@@ -203,7 +223,7 @@ export const ProducerDashboard = () => {
                   </p>
                 </div>
 
-                {/* FASE G4/G5: Consegna */}
+                {/* PHASE G4/G5: delivery */}
                 <div className="relative z-10 flex flex-col items-center text-center">
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 border-4 border-white shadow-sm transition-all duration-500 ${
                     currentState === 'ORDERS_RECEIVED' 
@@ -221,7 +241,7 @@ export const ProducerDashboard = () => {
             </div>
           )}
 
-          {/* BOTTONE AZIONE PRINCIPALE (Validazione, Prepara Ordini) */}
+          {/* MAIN ACTION BUTTON (validation, prepare orders) */}
           {actionBtn && (
             <div className="mt-8 w-full max-w-sm">
               {actionBtn}
@@ -230,7 +250,7 @@ export const ProducerDashboard = () => {
         </div>
       </div>
 
-      {/* 2. VALIDAZIONE LISTINO - Workflow G1->G2 (Scompare in automatico quando scade) */}
+      {/* 2. PRICE LIST VALIDATION - G1->G2 workflow (disappears automatically when it expires) */}
       {currentState === 'LIST_OPEN' && (
         <div className={`p-6 rounded-[2rem] border transition-all duration-500 ${status.isValidated ? 'bg-emerald-50 border-emerald-100' : 'bg-amber-50 border-amber-200 shadow-lg shadow-amber-100/20 animate-in zoom-in-95'}`}>
           <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
@@ -261,7 +281,7 @@ export const ProducerDashboard = () => {
         </div>
       )}
 
-      {/* 3. MESSAGGI DI SERVIZIO */}
+      {/* 3. SERVICE MESSAGES */}
       {status.messages && status.messages.length > 0 && (
         <div className="space-y-4">
           <h3 className="text-sm font-black text-slate-400 uppercase tracking-[0.15em] px-2 flex items-center gap-2">
@@ -272,10 +292,10 @@ export const ProducerDashboard = () => {
           <div className="grid grid-cols-1 gap-3">
             {status.messages.map((msg) => (
               <div 
-                key={msg.id} // <-- Usiamo l'ID reale del DB
+                key={msg.id} // <-- Use the real DB id
                 className="bg-white p-5 rounded-[2rem] border border-amber-100 shadow-sm shadow-amber-50/50 flex items-start gap-4 hover:shadow-md transition-all duration-300 group relative"
               >
-                {/* BOTTONE X PER CHIUDERE */}
+                {/* X BUTTON TO CLOSE */}
                 <button 
                   onClick={() => handleDismissMessage(msg.id)}
                   className="absolute top-4 right-4 p-1.5 text-slate-300 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-all opacity-0 group-hover:opacity-100"
@@ -287,7 +307,7 @@ export const ProducerDashboard = () => {
                 <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl shrink-0 group-hover:scale-110 transition-transform">
                   <AlertCircle size={20} />
                 </div>
-                <div className="flex-1 min-w-0 pr-6"> {/* pr-6 per non sormontare la X */}
+                <div className="flex-1 min-w-0 pr-6"> {/* pr-6 so it does not overlap the X */}
                   <div className="flex justify-between items-start gap-2">
                     <h4 className="font-black text-slate-800 text-sm leading-tight">{msg.title || msg.subject}</h4>
                     <span className="text-[9px] font-black text-amber-500 bg-amber-50 px-2 py-0.5 rounded-full uppercase tracking-tighter shrink-0">Azienda</span>
@@ -303,7 +323,7 @@ export const ProducerDashboard = () => {
         </div>
       )}
 
-      {/* 4. ASSISTENZA */}
+      {/* 4. SUPPORT */}
       <div className="bg-emerald-50 rounded-[2rem] p-6 flex items-start gap-4 border border-emerald-100 shadow-sm">
         <div className="p-3 bg-emerald-100 rounded-2xl text-emerald-600 shrink-0">
           <Info size={24} />

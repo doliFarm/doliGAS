@@ -1,13 +1,33 @@
-/**
- * Strumenti comuni ai test.
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
  *
- * Dati: ogni file di test parte dal seed demo (backend/db/seeds/demo.sql), ricaricato
- * da zero con resetDb(). Riferimenti utili del seed:
- * - GAS 1 "demo"; utente 1 coordinatore; utenti 2-5 produttori (producers 1-4);
- *   utenti 6-10 soci (Giulia 124 €, Roberto 60 €, Sara 95 €, Luca 45 €, Anna 108,50 €);
- * - ciclo 2 "Ciclo in corso" con il mercato aperto; i produttori 1-3 hanno validato,
- *   la Cantina (producer 4, prodotti 10-12) no;
- * - ordini confermati nel ciclo 2: #1 Giulia 26 €, #2 Roberto 20,50 €, #3 Sara 105 €, #4 Anna 11,50 €.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
+/**
+ * Shared test helpers.
+ *
+ * Data: every test file starts from the demo seed (backend/db/seeds/demo.sql), reloaded
+ * from scratch with resetDb(). Useful references in the seed:
+ * - GAS 1 "demo"; user 1 coordinator; users 2-5 producers (producers 1-4);
+ *   users 6-10 members (Giulia €124, Roberto €60, Sara €95, Luca €45, Anna €108.50);
+ * - cycle 2 "Ciclo in corso" with the market open; producers 1-3 have validated,
+ *   the Cantina (producer 4, products 10-12) has not;
+ * - confirmed orders in cycle 2: #1 Giulia €26, #2 Roberto €20.50, #3 Sara €105, #4 Anna €11.50.
  */
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
@@ -29,16 +49,16 @@ const USERS = {
     anna: { id: 10, email: 'anna@socio.it' }
 };
 
-/** Svuota il database di test e ricarica il seed demo. */
+/** Empties the test database and reloads the demo seed. */
 const resetDb = () => loadSeed({ name: 'demo', reset: true, log: () => {} });
 
-/** Esegue una query e restituisce le righe. */
+/** Runs a query and returns the rows. */
 const sql = async (query, params = []) => (await pool.query(query, params))[0];
 
-/** Token JWT come quello emesso da /api/auth/verify. */
+/** JWT token like the one issued by /api/auth/verify. */
 const tokenFor = (user) => jwt.sign({ id: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
-/** Client HTTP già autenticato come l'utente indicato. */
+/** HTTP client already authenticated as the given user. */
 const as = (user) => {
     const auth = (r) => r.set('Authorization', `Bearer ${tokenFor(user)}`);
     return {
@@ -54,10 +74,10 @@ const balanceOf = async (user) =>
     Number((await sql('SELECT balance FROM gas_memberships WHERE user_id = ? AND gas_id = ?', [user.id, GAS_ID]))[0].balance);
 
 /**
- * Sposta il ciclo in una fase: le date vengono riscritte rispetto a NOW() nel database.
- * - 'listini':  prima della scadenza G2 (il produttore può modificare il listino)
- * - 'mercato':  mercato aperto (G3-G4)
- * - 'chiuso':   mercato chiuso, prima della consegna (G4-G7)
+ * Moves the cycle to a phase: dates are rewritten relative to NOW() in the database.
+ * - 'listini':  before the G2 deadline (the producer can edit the price list)
+ * - 'mercato':  market open (G3-G4)
+ * - 'chiuso':   market closed, before delivery (G4-G7)
  */
 const setPhase = async (phase, cycleId = CYCLE_ID) => {
     const offsets = {

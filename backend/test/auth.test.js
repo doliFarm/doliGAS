@@ -1,4 +1,24 @@
-// Accesso con codice OTP e contesto GAS
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
+// Login with OTP code and GAS context
 const { request, app, as, resetDb, closePool, USERS, GAS_ID } = require('./helpers');
 
 beforeAll(resetDb);
@@ -18,7 +38,7 @@ describe('login con OTP', () => {
         expect(r2.body.token).toBeTruthy();
         expect(r2.body.profiles.some(p => p.context_id === GAS_ID && p.role_name === 'Socio')).toBe(true);
 
-        // Il codice si usa una volta sola
+        // The code can be used only once
         const r3 = await verify(USERS.giulia.email, r1.body.debug_code);
         expect(r3.status).toBe(400);
     });
@@ -27,8 +47,8 @@ describe('login con OTP', () => {
         const { body } = await login(USERS.roberto.email);
         const wrong = body.debug_code === '000000' ? '111111' : '000000';
         for (let i = 0; i < 4; i++) expect((await verify(USERS.roberto.email, wrong)).status).toBe(400);
-        expect((await verify(USERS.roberto.email, wrong)).status).toBe(429); // il quinto
-        // Anche il codice giusto non vale più
+        expect((await verify(USERS.roberto.email, wrong)).status).toBe(429); // the fifth one
+        // Even the right code is no longer valid
         expect((await verify(USERS.roberto.email, body.debug_code)).status).not.toBe(200);
     });
 

@@ -1,9 +1,29 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /* =============================================================================
-   FILE: frontend/src/views/member/OrderHistoryView.jsx - v6.1
-   STATUS: Integro, Completo, Robusto.
-   DESC: Storico Ordini con supporto Multi-Context e Modalità Tabella/Grid.
-   FIX: Iniezione gasId per recuperare solo gli ordini del GAS attivo.
-   ============================================================================= */
+  FILE: frontend/src/views/member/OrderHistoryView.jsx - v6.1
+  DESC: order history with multi-context support and table/grid modes.
+  FIX: gasId injected to load only the orders of the active GAS.
+  =============================================================================
+*/
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
@@ -18,7 +38,7 @@ const API_URL = import.meta.env.VITE_API_URL || '';
 
 export const OrderHistoryView = () => {
   const { t } = useTranslation();
-  const { activeProfile } = useAuth(); // Recupero Profilo
+  const { activeProfile } = useAuth(); // Load the profile
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -28,7 +48,7 @@ export const OrderHistoryView = () => {
   const [viewMode, setViewMode] = useState('TABLE'); // 'GRID' | 'TABLE'
   const [sortConfig, setSortConfig] = useState({ key: 'created_at', direction: 'desc' });
 
-  // 1. Fetch Dati
+  // 1. Data fetch
   useEffect(() => {
     const fetchOrders = async () => {
       if (!activeProfile?.context_id) return;
@@ -36,7 +56,7 @@ export const OrderHistoryView = () => {
 
       try {
         setLoading(true);
-        // Iniezione gasId
+        // gasId injection
         const res = await axios.get(`${API_URL}/api/members/orders?gasId=${gasId}`);
         setOrders(res.data);
       } catch (err) { 
@@ -55,7 +75,7 @@ export const OrderHistoryView = () => {
     setDetailsLoading(true);
     setSelectedOrder({ id: orderId }); 
     try {
-      // Iniezione gasId anche per il dettaglio
+      // gasId injection for the details too
       const res = await axios.get(`${API_URL}/api/members/orders/${orderId}?gasId=${gasId}`);
       setSelectedOrder(res.data);
     } catch (err) { 
@@ -67,7 +87,7 @@ export const OrderHistoryView = () => {
 
   const printOrder = () => window.print();
 
-  // 2. Logica Ordinamento
+  // 2. Sorting logic
   const handleSort = (key) => {
     setSortConfig(prev => ({
       key,
@@ -102,7 +122,7 @@ export const OrderHistoryView = () => {
   return (
     <div className="pb-24 space-y-4 animate-in fade-in">
       
-      {/* HEADER E CONTROLLI */}
+      {/* HEADER AND CONTROLS */}
       <div className="flex items-center justify-between px-2">
         <h2 className="text-lg font-black text-slate-800 flex items-center gap-2">
           <ClipboardList className="text-emerald-600"/> {t('member_orders.title')}
@@ -120,7 +140,7 @@ export const OrderHistoryView = () => {
         </div>
       ) : (
         <>
-          {/* VISTA GRIGLIA */}
+          {/* GRID VIEW */}
           {viewMode === 'GRID' && (
             <div className="space-y-3">
               {sortedOrders.map(order => (
@@ -151,7 +171,7 @@ export const OrderHistoryView = () => {
             </div>
           )}
 
-          {/* VISTA TABELLA SORTABLE */}
+          {/* SORTABLE TABLE VIEW */}
           {viewMode === 'TABLE' && (
              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
@@ -201,7 +221,7 @@ export const OrderHistoryView = () => {
         </>
       )}
 
-      {/* MODALE DETTAGLIO */}
+      {/* DETAIL MODAL */}
       {selectedOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 print:p-0 print:bg-white print:static">
           <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] print:max-h-none print:shadow-none print:w-full print:max-w-none">

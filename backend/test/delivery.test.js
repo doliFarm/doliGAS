@@ -1,4 +1,24 @@
-// Dalla chiusura del mercato alla consegna: pesatura (G6) e conguaglio (G7)
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
+// From market closing to delivery: weighing (G6) and adjustment (G7)
 const { as, resetDb, closePool, sql, balanceOf, setPhase, USERS, GAS_ID, CYCLE_ID } = require('./helpers');
 
 afterAll(closePool);
@@ -19,7 +39,7 @@ describe('pesatura', () => {
         const r = await coord().get(`/api/admin/logistics/checkin/${CYCLE_ID}?gasId=${GAS_ID}`);
         expect(r.status).toBe(200);
         const arance = r.body.find(p => p.product_id === 1);
-        expect(Number(arance.qty_ordered)).toBe(10.25); // Giulia 3 + Sara 6 + Anna 1,25
+        expect(Number(arance.qty_ordered)).toBe(10.25); // Giulia 3 + Sara 6 + Anna 1.25
         expect(arance.total_members_involved).toBe(3);
     });
 
@@ -31,7 +51,7 @@ describe('pesatura', () => {
     });
 
     test('unità discrete: quote intere', async () => {
-        // Pecorino (pezzi): Giulia 1, Sara 5; ne arrivano 5
+        // Pecorino (pieces): Giulia 1, Sara 5; 5 arrive
         await weigh([{ productId: 4, totalReceived: 5 }]);
         expect([await received(1, 4), await received(3, 4)]).toEqual([1, 4]);
     });
@@ -45,7 +65,7 @@ describe('pesatura', () => {
 
 describe('consegna con conguaglio', () => {
     test('peso inferiore: si restituisce la differenza (REFUND)', async () => {
-        // Giulia: ordine #1 da 26 €, saldo 124 €. Arance: 2,63 kg invece di 3 → -0,74 €
+        // Giulia: order #1 for €26, balance €124. Oranges: 2.63 kg instead of 3 → -€0.74
         await weigh([{ productId: 1, totalReceived: 9 }]);
         const r = await deliver(1);
         expect(r.status).toBe(200);
@@ -58,7 +78,7 @@ describe('consegna con conguaglio', () => {
     });
 
     test('peso superiore: si addebita la differenza (SPESA)', async () => {
-        // Roberto: pane 2 kg a 3,50 €, ne arrivano 2,40 → +1,40 €
+        // Roberto: bread 2 kg at €3.50, 2.40 kg arrive → +€1.40
         await weigh([{ productId: 7, totalReceived: 2.4 }]);
         const r = await deliver(2);
         expect(r.body.adjustment).toBe(1.4);
@@ -67,7 +87,7 @@ describe('consegna con conguaglio', () => {
 
     test('peso uguale: nessun movimento, il totale non viene riaddebitato', async () => {
         const txBefore = (await sql('SELECT COUNT(*) AS n FROM wallet_transactions'))[0].n;
-        const r = await deliver(4); // Anna: niente pesato, vale l'ordinato
+        const r = await deliver(4); // Anna: nothing weighed, the ordered quantity applies
         expect(r.body.adjustment).toBe(0);
         expect(await balanceOf(USERS.anna)).toBe(108.5);
         expect((await sql('SELECT COUNT(*) AS n FROM wallet_transactions'))[0].n).toBe(txBefore);
@@ -85,7 +105,7 @@ describe('consegna con conguaglio', () => {
         await weigh([{ productId: 1, totalReceived: 9 }, { productId: 4, totalReceived: 5 }, { productId: 7, totalReceived: 2.4 }]);
         for (const id of [1, 2, 3, 4]) expect((await deliver(id)).status).toBe(200);
 
-        // Per ogni socio: saldo = somma dei movimenti completati (registro e saldo coerenti)
+        // For each member: balance = sum of completed transactions (ledger and balance agree)
         const rows = await sql(`
             SELECT m.user_id, m.balance,
                    (SELECT COALESCE(SUM(t.amount), 0) FROM wallet_transactions t
@@ -93,7 +113,7 @@ describe('consegna con conguaglio', () => {
             FROM gas_memberships m WHERE m.gas_id = ? AND m.user_id IN (6, 7, 8, 10)`, [GAS_ID]);
         for (const r of rows) expect(Number(r.balance)).toBeCloseTo(Number(r.ledger), 2);
 
-        // Sara: arance 5,27 kg, pecorino 4 pz, ricotta 3, yogurt 4 → 10,54 + 48 + 27 + 6 = 91,54
+        // Sara: oranges 5.27 kg, pecorino 4 pcs, ricotta 3, yogurt 4 → 10.54 + 48 + 27 + 6 = 91.54
         expect(await balanceOf(USERS.sara)).toBeCloseTo(200 - 91.54, 2);
     });
 });
@@ -103,7 +123,7 @@ describe('ricarica del socio', () => {
         const socio = as(USERS.giulia);
         const r = await socio.post('/api/members/wallet/topup-request', { gasId: GAS_ID, amount: 50, description: 'Bonifico' });
         expect(r.status).toBe(200);
-        expect(await balanceOf(USERS.giulia)).toBe(124); // in attesa: il saldo non cambia
+        expect(await balanceOf(USERS.giulia)).toBe(124); // pending: the balance does not change
 
         expect((await socio.post('/api/members/wallet/topup-request', { gasId: GAS_ID, amount: 10 })).status).toBe(409);
 
@@ -111,7 +131,7 @@ describe('ricarica del socio', () => {
         expect(ok.status).toBe(200);
         expect(await balanceOf(USERS.giulia)).toBe(174);
 
-        // Approvare due volte non accredita due volte
+        // Approving twice does not credit twice
         await coord().post(`/api/admin/wallet/approve/${r.body.transactionId}?gasId=${GAS_ID}`, {});
         expect(await balanceOf(USERS.giulia)).toBe(174);
     });

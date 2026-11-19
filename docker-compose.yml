@@ -2,7 +2,7 @@ services:
   # --- DATABASE SERVICE ---
   gashub-db:
     image: mysql:8.4
-    # Ottimizzazione MySQL 8.4 per VPS con poca RAM (riduciamo i buffer di default)
+    # MySQL 8.4 tuning for a low-RAM VPS (smaller default buffers)
     command: 
       - "mysqld"
       - "--mysql-native-password=ON"
@@ -20,7 +20,7 @@ services:
       MYSQL_PASSWORD: ${DB_PASSWORD}
     volumes:
       - ./mysql-data:/var/lib/mysql
-      # Non contiene più lo schema: le tabelle sono create dalle migrazioni del backend
+      # No longer contains the schema: tables are created by the backend migrations
       - ./mysql-init:/docker-entrypoint-initdb.d
     logging:
       driver: json-file
@@ -32,14 +32,14 @@ services:
     deploy:
       resources:
         limits:
-          memory: 768M    # Ridotto: 1GB è troppo per un DB PoC su questa VPS
+          memory: 768M    # Reduced: 1GB is too much for a PoC DB on this VPS
           cpus: '0.40'
         reservations:
           memory: 256M
     healthcheck:
-      # FIX ROBUSTEZZA: Usiamo mysqladmin ma con un timeout più lungo per lo swap
-      # $$ sfugge all'interpolazione di compose: la password è letta DENTRO il container,
-      # così non compare in chiaro nell'output di docker inspect
+      # mysqladmin with a longer timeout, to cope with swapping
+      # $$ escapes compose interpolation: the password is read INSIDE the container,
+      # so it does not appear in clear text in the docker inspect output
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$${MYSQL_ROOT_PASSWORD}"]
       interval: 40s
       timeout: 20s
@@ -62,7 +62,7 @@ services:
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ${DB_NAME}
-      # Migrazioni dello schema applicate all'avvio (mettere a false per applicarle a mano)
+      # Schema migrations applied at startup (set to false to apply them by hand)
       DB_AUTO_MIGRATE: ${DB_AUTO_MIGRATE:-true}
       PORT: ${API_PORT}
       JWT_SECRET: ${JWT_SECRET}
@@ -73,7 +73,7 @@ services:
       APP_ENV: ${APP_ENV}
     depends_on:
       gashub-db:
-        condition: service_healthy # Importante: avvia l'API solo quando il DB è pronto
+        condition: service_healthy # Important: start the API only when the DB is ready
     volumes:
       - ./backend:/app
       - /app/node_modules
@@ -88,12 +88,12 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M    # Ridotto: Node.js per questa API non richiede 1GB
+          memory: 512M    # Reduced: Node.js does not need 1GB for this API
           cpus: '0.30'
         reservations:
           memory: 256M
     healthcheck:
-      # Sostituito localhost con 127.0.0.1 per forzare IPv4 e aggirare il problema ::1
+      # 127.0.0.1 instead of localhost, to force IPv4 and avoid the ::1 problem
       test: ["CMD-SHELL", "node -e 'require(\"http\").get(\"http://127.0.0.1:${API_PORT}/health\", (res) => process.exit(res.statusCode === 200 ? 0 : 1)).on(\"error\", () => process.exit(1))'"]
       interval: 40s
       timeout: 10s
@@ -118,7 +118,7 @@ services:
     environment:
       - VITE_API_URL=${VITE_API_URL}
       - VITE_APP_ENV=${APP_ENV}
-      # Usato dal target dev (server Vite); nel target prod vale il build arg qui sopra
+      # Used by the dev target (Vite server); in the prod target the build arg above applies
       - VITE_DEMO_MODE=${VITE_DEMO_MODE:-false}
     depends_on:
       - gashub-api
@@ -135,7 +135,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256M    # 512M per un frontend statico/Vite è eccessivo
+          memory: 256M    # 512M is too much for a static/Vite frontend
           cpus: '0.20'
         reservations:
           memory: 128M

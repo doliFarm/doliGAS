@@ -1,4 +1,24 @@
-// Ordine del socio: addebito immediato, modifiche, credito, stock
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
+// Member order: immediate charge, changes, credit, stock
 const { as, resetDb, closePool, sql, balanceOf, setPhase, USERS, GAS_ID, CYCLE_ID } = require('./helpers');
 
 afterAll(closePool);
@@ -13,7 +33,7 @@ describe('addebito all\'ordine', () => {
     beforeEach(resetDb);
 
     test('nuovo ordine: il saldo scende subito del totale e resta traccia SPESA', async () => {
-        // Luca (45 €) non ha ordini nel ciclo
+        // Luca (€45) has no orders in the cycle
         const r = await order(USERS.luca, [{ productId: 1, qty: 2 }, { productId: 7, qty: 1 }]); // 4 + 3,50
         expect(r.status).toBe(200);
         expect(await balanceOf(USERS.luca)).toBe(37.5);
@@ -23,7 +43,7 @@ describe('addebito all\'ordine', () => {
     });
 
     test('modifica dell\'ordine: si addebita o si restituisce solo la differenza', async () => {
-        // Giulia ha già l'ordine #1 da 26 € e 124 € di saldo
+        // Giulia already has order #1 for €26 and a €124 balance
         let r = await order(USERS.giulia, [{ productId: 4, qty: 3 }]); // 36 €: +10
         expect(r.status).toBe(200);
         expect(r.body.orderId).toBe(1);
@@ -33,7 +53,7 @@ describe('addebito all\'ordine', () => {
         expect(await balanceOf(USERS.giulia)).toBe(148);
         expect(await lastTx(USERS.giulia)).toEqual({ amount: '34.00', type: 'SPESA' });
 
-        // Una sola riga ordine per socio e ciclo, con le righe sostituite
+        // A single order per member and cycle, with its lines replaced
         const items = await sql('SELECT product_id, quantity FROM order_items WHERE order_id = 1');
         expect(items).toEqual([{ product_id: 1, quantity: '1.00' }]);
     });
@@ -41,7 +61,7 @@ describe('addebito all\'ordine', () => {
     test('credito insufficiente: rifiutato senza toccare saldo né ordine', async () => {
         const r = await order(USERS.luca, [{ productId: 11, qty: 1 }, { productId: 4, qty: 4 }]);
         expect(r.status).toBe(400);
-        // La Cantina non ha validato: l'errore è sul prodotto, prima ancora del credito
+        // The Cantina has not validated: the error is on the product, before the credit check
         expect(r.body.error).toMatch(/^PRODOTTO_NON_DISPONIBILE/);
 
         const r2 = await order(USERS.luca, [{ productId: 4, qty: 4 }]); // 48 € > 45 €
@@ -91,7 +111,7 @@ describe('addebito all\'ordine', () => {
 });
 
 describe('stock', () => {
-    // Pecorino (id 4) con stock 3 e nessun ordine nel ciclo
+    // Pecorino (id 4) with stock 3 and no orders in the cycle
     beforeEach(async () => {
         await resetDb();
         await sql('UPDATE products SET stock = 3 WHERE id = 4');
@@ -106,7 +126,7 @@ describe('stock', () => {
         expect((await order(USERS.giulia, [{ productId: 4, qty: 2 }])).status).toBe(200);
         expect(await available(USERS.roberto)).toBe(1);
         expect(await available(USERS.giulia)).toBe(3);
-        // products.stock non viene scalato
+        // products.stock is not decremented
         expect((await sql('SELECT stock FROM products WHERE id = 4'))[0].stock).toBe(3);
     });
 
@@ -136,7 +156,7 @@ describe('stock', () => {
     });
 
     test('due ordini in parallelo sull\'ultima disponibilità: ne passa uno solo', async () => {
-        await order(USERS.roberto, [{ productId: 4, qty: 1 }]); // restano 2
+        await order(USERS.roberto, [{ productId: 4, qty: 1 }]); // 2 left
         const results = await Promise.all([
             order(USERS.giulia, [{ productId: 4, qty: 2 }]),
             order(USERS.anna, [{ productId: 4, qty: 2 }])

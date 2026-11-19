@@ -26,41 +26,34 @@ doliGAS è una web app multi-tenant per i Gruppi di Acquisto Solidale (GAS), con
 - **Modello wallet (DECISO):** l'importo ordinato **si scala subito all'ordine** (`routes/members.js POST /order`). **Alla consegna si fa il conguaglio** sul peso reale (`routes/admin/logistics.js POST /checkout/deliver`): `SPESA` se costa di più, `REFUND` se costa di meno. Non va mai riaddebitato il totale.
 
 ## Stato (19/11/2026)
-Tutto il lavoro è in `main` su GitHub: PR #1 (sicurezza, consegna, migrazioni), #3 (integrazione del lavoro fatto a mano sulla demo) e #4 (Fase 2). Non ci sono rami aperti.
+Tutto il lavoro è in `main` su GitHub: PR #1 (sicurezza, consegna, migrazioni), #3 (integrazione del lavoro fatto a mano sulla demo), #4 (Fase 2) e #5 (stock).
 
-**Sulla demo è in produzione solo fino alla PR #3.** La Fase 2 (`96c579a`) è unita ma **non ancora rilasciata**.
-
-### Rilascio della Fase 2 sulla demo (da fare)
-Lo scheduler, partendo per la prima volta, troverebbe le tappe del ciclo attivo con date passate e mai notificate e le recupererebbe tutte insieme, mandando ai soci avvisi vecchi. Quindi si rilascia con lo scheduler spento, si sopprime l'arretrato, poi lo si accende:
+**La demo è allineata a `main` (`00ad608`)**, con le migrazioni 001–004 applicate e lo scheduler acceso. La Fase 2 è stata rilasciata il 19/11 alle 09:28 UTC, sopprimendo l'arretrato con `backend/db/tools/sopprimi-eventi-passati.sql`, e lo stock alle 09:58 UTC. Per un rilascio senza migrazioni delicate bastano:
 
 ```
 cd ~/doliGAS
 git status && git log origin/main..main      # deve essere vuoto: niente lavoro locale
-echo "SCHEDULER_ENABLED=false" >> .env
 git fetch origin && git merge --ff-only origin/main
 docker compose up -d --build
-docker compose exec gashub-api npm run migrate:status   # deve elencare 003_cycle_events.sql
-docker compose exec -T gashub-db sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE"' \
-  < backend/db/tools/sopprimi-eventi-passati.sql
-sed -i 's/^SCHEDULER_ENABLED=false/SCHEDULER_ENABLED=true/' .env
-docker compose up -d gashub-api
-docker logs --tail=20 gashub-api      # atteso: [SCHEDULER] 🕒 Automazione G1-G7 avviata
+docker compose exec gashub-api npm run migrate:status
 ```
+Sul server `git fetch` richiede l'inoltro dell'agente SSH (`ssh -A`), perché il server non ha una chiave GitHub sua.
 
 ### Da provare dall'interfaccia dopo il rilascio
-Quattro flussi nuovi che nessuno ha ancora toccato dal browser:
+Flussi nuovi che nessuno ha ancora toccato dal browser:
 - coordinatore: modifica di un ciclo (prima dava 404) e import CSV del catalogo;
 - socio: dichiarazione di una ricarica dal portafoglio, poi approvazione del coordinatore;
 - produttore: pagina Ordini, che prima era sempre vuota (serve un ciclo a mercato chiuso con ordini).
+- socio: negozio con "Disponibili: N" ed "Esaurito" sui prodotti con stock (sulla demo sono 7), e il rifiuto quando si chiede più del disponibile;
+- produttore: conferma della fornitura dopo la chiusura del mercato, che ora resta salvata per ciclo.
 
 ## Prossimi passi
 Il piano completo è in `docs/piano-stabilizzazione.md`; l'analisi dei problemi (#1–#17) è in `docs/analisi-codice.md`.
 
-Fase 0 (sicurezza), Fase 1 (migrazioni) e Fase 2 (ciclo G1–G7 ed endpoint mancanti) sono fatte. Resta:
+Fase 0 (sicurezza), Fase 1 (migrazioni) e Fase 2 (ciclo G1–G7, endpoint mancanti e stock) sono fatte e rilasciate. Resta:
 
-1. **Stock** (#15): fatto sul ramo `stock` (migrazione `004`), da unire con una PR e rilasciare insieme alla Fase 2.
-2. **Fase 3, qualità:** test automatici (Jest + supertest su un MySQL di test) del flusso completo — ciclo, listino, validazione, ordine, pesatura, consegna, saldo; validazione degli input con schemi; pulizia del codice morto (`routes/contact.js`, `routes/admin/dashboard.js`, `routes/admin/products.js` non sono montati; mock nel frontend); proxy Vite che punta a `gashub-backend` invece di `gashub-api`; CI minima. Da allineare anche le traduzioni: a `en.json` e `fr.json` mancano 57 chiavi di `it.json`.
-3. **Fase 4, connettore Dolibarr opzionale:** campi `external_ref` e `external_source`; per il produttore il suo Dolibarr (listino in entrata, ordini G5 come ordini cliente), per il GAS il proprio Dolibarr (fornitori, ordini fornitore, fatture ai soci); sincronizzazione asincrona con una tabella outbox.
+1. **Fase 3, qualità:** test automatici (Jest + supertest su un MySQL di test) del flusso completo — ciclo, listino, validazione, ordine, pesatura, consegna, saldo; validazione degli input con schemi; pulizia del codice morto (`routes/contact.js`, `routes/admin/dashboard.js`, `routes/admin/products.js` non sono montati; mock nel frontend); proxy Vite che punta a `gashub-backend` invece di `gashub-api`; CI minima. Da allineare anche le traduzioni: a `en.json` e `fr.json` mancano 57 chiavi di `it.json`.
+2. **Fase 4, connettore Dolibarr opzionale:** campi `external_ref` e `external_source`; per il produttore il suo Dolibarr (listino in entrata, ordini G5 come ordini cliente), per il GAS il proprio Dolibarr (fornitori, ordini fornitore, fatture ai soci); sincronizzazione asincrona con una tabella outbox.
 
 ### Decisioni in sospeso
 - Le tabelle `permissions`, `role_permissions` e `user_permissions` esistono nel database ma nessun codice le usa: erano il disegno di permessi granulari, di cui resta traccia in `frontend/src/mockCoordinatorData.js` (dieci permessi, ruoli personalizzabili come "Volontario Logistica"). Da realizzare o rimuovere con una migrazione.
@@ -91,6 +84,8 @@ In locale i container si avviano con `docker compose -f docker-compose.yml -f do
 - La ripartizione della pesatura usa `utils/allocation.js` (metodo dei resti maggiori): la somma delle quote è esattamente il totale ricevuto e le unità discrete restano numeri interi.
 
 ## Convenzioni
-- Commit in italiano, piccoli, uno per argomento. **Senza righe di firma**: niente `Co-Authored-By` né `Claude-Session` nei messaggi di commit e nelle descrizioni delle pull request.
-- Commenti nel codice in italiano. Dopo ogni modifica a un file JS: `node --check <file>`.
+- **Tutto ciò che va su GitHub è in inglese**: messaggi di commit, titoli e descrizioni delle pull request, commenti. Commit piccoli, uno per argomento. **Senza righe di firma**: niente `Co-Authored-By` né `Claude-Session` nei messaggi di commit e nelle descrizioni delle pull request.
+- **Commenti nel codice in inglese.** I messaggi rivolti agli utenti (errori delle API, log, interfaccia) restano in italiano, o passano da i18n.
+- **Licenza AGPL-3.0-or-later.** Ogni file di codice (JS/JSX, SQL di seed e strumenti) comincia con il preambolo della licenza (copyright "Luigi Grillo (doliFarm)", riga `SPDX-License-Identifier: AGPL-3.0-or-later`): copialo da un file esistente quando ne crei uno nuovo. Fanno eccezione le migrazioni già applicate, che non si toccano (checksum); le migrazioni nuove lo includono.
+- Dopo ogni modifica a un file JS: `node --check <file>`.
 - Prima di modificare il comportamento del ciclo o del wallet, chiedi conferma a Luigi.

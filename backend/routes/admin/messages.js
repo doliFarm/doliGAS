@@ -1,35 +1,55 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * @file backend/routes/admin/messages.js
- * @description Gestione Messaggistica e Notifiche (Coordinatore).
- * STATUS: Integro, Completo, Robusto.
- * FIX: Allineamento recupero gasId per prevenire Error 500.
+ * @description Messaging and notifications (Coordinator).
+ * STATUS: Stable.
+ * FIX: aligned gasId lookup to prevent error 500.
  */
 
 const express = require('express');
 const router = express.Router();
 
 /**
- * Helper per acquisire il pool di connessioni singleton.
+ * Helper returning the singleton connection pool.
  */
 const getDb = () => global.pool || require('../../config/db');
 
 /**
  * @route   POST /api/admin/messages/send
- * @desc    Invia una notifica interna a uno o più utenti (singolo o bulk)
+ * @desc    Sends an internal notification to one or more users (single or bulk)
  */
 router.post('/send', async (req, res) => {
     const pool = getDb();
-    // Riceviamo target_profile dal frontend (es: 'member' o 'producer')
+    // target_profile comes from the frontend (e.g. 'member' or 'producer')
     const { recipientIds, subject, message, target_profile } = req.body; 
     
-    const gasId = req.user?.verifiedGasId; // SICUREZZA: solo il gasId verificato
+    const gasId = req.user?.verifiedGasId; // SECURITY: only the verified gasId
 
     if (!gasId) return res.status(400).json({ error: "Contesto GAS non identificato." });
     if (!recipientIds || !Array.isArray(recipientIds) || recipientIds.length === 0) {
         return res.status(400).json({ error: "Nessun destinatario selezionato." });
     }
 
-    // Validazione del profilo target (Fallback su 'member' se omesso per sicurezza)
+    // Target profile validation (falls back to 'member' if omitted, for safety)
     const validProfiles = ['member', 'coordinator', 'producer'];
     const finalProfile = validProfiles.includes(target_profile) ? target_profile : 'member';
 
@@ -37,7 +57,7 @@ router.post('/send', async (req, res) => {
     try {
         await conn.beginTransaction();
         
-        // Inserimento con target_profile segregato
+        // Insert with a segregated target_profile
         const insertQuery = `
             INSERT INTO notifications (gas_id, user_id, target_profile, title, message, type, is_read, created_at)
             VALUES (?, ?, ?, ?, ?, 'info', 0, NOW())

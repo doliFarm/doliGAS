@@ -1,31 +1,51 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * @file backend/cron/scheduler.js
- * @description Motore di automazione del ciclo G1-G7.
+ * @description Automation engine for the G1-G7 cycle.
  *
- * Ogni ora controlla i cicli attivi e invia le notifiche delle tappe raggiunte.
+ * Every hour it checks the active cycles and sends the notifications for the steps reached.
  *
- * Due proprietà importanti:
- * - **una volta sola**: ogni evento viene registrato in `cycle_events` con una chiave
- *   unica (cycle_id, event_key). L'inserimento avviene PRIMA dell'invio, quindi un
- *   secondo processo o un riavvio non possono duplicare le notifiche;
- * - **niente eventi perduti**: la condizione è "la data è passata e l'evento non è
- *   ancora stato inviato", non "la data è passata nell'ultima ora". Se il server
- *   resta spento per un giorno, al ritorno recupera le tappe mancate.
+ * Two important properties:
+ * - **exactly once**: each event is recorded in `cycle_events` with a unique key
+ *   (cycle_id, event_key). The insert happens BEFORE sending, so a second process
+ *   or a restart cannot duplicate notifications;
+ * - **no lost events**: the condition is "the date has passed and the event has not
+ *   been sent yet", not "the date passed within the last hour". If the server is down
+ *   for a day, when it comes back it catches up on the missed steps.
  *
- * L'avviso G4_REMINDER è l'eccezione: è un promemoria prima della chiusura e perde
- * senso dopo, quindi scade insieme al mercato.
+ * The G4_REMINDER notice is the exception: it is a reminder before closing and makes
+ * no sense afterwards, so it expires together with the market.
  */
 
 const cron = require('node-cron');
 const getDb = () => global.pool || require('../config/db');
 const { notifyAllMembers, notifyAllProducers, notifyCoordinatorRaw } = require('../utils/notifications');
 
-const CRON_EXPRESSION = process.env.SCHEDULER_CRON || '0 * * * *'; // ogni ora al minuto 0
+const CRON_EXPRESSION = process.env.SCHEDULER_CRON || '0 * * * *'; // every hour at minute 0
 const REMINDER_HOURS_BEFORE_CLOSE = 3;
 
 /**
- * Tenta di prendere in carico un evento. Restituisce true solo al primo chiamante:
- * la chiave unica fa fallire ogni tentativo successivo.
+ * Tries to claim an event. Returns true only to the first caller:
+ * the unique key makes every later attempt fail.
  */
 const claimEvent = async (cycleId, eventKey) => {
     const pool = getDb();
@@ -37,11 +57,11 @@ const claimEvent = async (cycleId, eventKey) => {
         return res.affectedRows > 0;
     } catch (e) {
         console.error(`[SCHEDULER] Impossibile registrare l'evento ${eventKey} del ciclo ${cycleId}:`, e.message);
-        return false; // in dubbio non si invia: meglio una notifica mancata che una doppia
+        return false; // when in doubt, do not send: a missed notification is better than a duplicate one
     }
 };
 
-/** Rilascia un evento preso in carico, se l'invio è fallito del tutto. */
+/** Releases a claimed event if sending failed completely. */
 const releaseEvent = async (cycleId, eventKey) => {
     const pool = getDb();
     try {
@@ -52,8 +72,8 @@ const releaseEvent = async (cycleId, eventKey) => {
 };
 
 /**
- * Verifica i minimi d'ordine (MOQ) alla chiusura del mercato e avvisa il coordinatore.
- * Gli ordini dei soci alla chiusura sono in stato 'confirmed' o 'processing'.
+ * Checks the minimum order quantities (MOQ) when the market closes and warns the coordinator.
+ * At closing time member orders are in status 'confirmed' or 'processing'.
  */
 const checkMoq = async (cycle) => {
     const pool = getDb();
@@ -89,7 +109,7 @@ const checkMoq = async (cycle) => {
     }
 };
 
-/** Tappe del ciclo, in ordine. `due` dice se il momento è arrivato. */
+/** Cycle steps, in order. `due` tells whether the moment has come. */
 const buildEvents = (cycle, now) => {
     const at = (field) => new Date(cycle[field]);
     const reminderAt = new Date(at('market_close_at').getTime() - REMINDER_HOURS_BEFORE_CLOSE * 3600 * 1000);
@@ -98,14 +118,14 @@ const buildEvents = (cycle, now) => {
         { key: 'G1_OPEN',       due: now >= at('start_at'),             run: (c, d) => notifyAllProducers(c.gas_id, 'G1_OPEN', d) },
         { key: 'G2_DEADLINE',   due: now >= at('producers_deadline'),   run: (c) => notifyCoordinatorRaw(c.gas_id, 'Listini chiusi', `È scaduto il termine per i listini di ${c.name}: verifica che i produttori abbiano validato.`, 'info') },
         { key: 'G3_SHOP_OPEN',  due: now >= at('market_open_at'),       run: (c, d) => notifyAllMembers(c.gas_id, 'G3_SHOP_OPEN', d) },
-        // Promemoria prima della chiusura: scade con il mercato, non si recupera dopo
+        // Reminder before closing: expires with the market, it is not caught up afterwards
         { key: 'G4_REMINDER',   due: now >= reminderAt && now < at('market_close_at'), run: (c, d) => notifyAllMembers(c.gas_id, 'G4_REMINDER', d) },
         { key: 'G4_CLOSE',      due: now >= at('market_close_at'),      run: (c) => checkMoq(c) },
         { key: 'G5_PROD_ORDER', due: now >= at('orders_sent_at'),       run: (c, d) => notifyAllProducers(c.gas_id, 'G5_PROD_ORDER', d) }
     ];
 };
 
-/** Un giro di controllo. Esportato per poterlo invocare a mano e nei test. */
+/** One check round. Exported so it can be run by hand and in tests. */
 const runOnce = async (now = new Date()) => {
     const pool = getDb();
     const [cycles] = await pool.execute("SELECT * FROM cycles WHERE is_active = 1");
@@ -121,7 +141,7 @@ const runOnce = async (now = new Date()) => {
 
         for (const event of buildEvents(cycle, now)) {
             if (!event.due) continue;
-            if (!await claimEvent(cycle.id, event.key)) continue; // già inviato, o preso da un altro processo
+            if (!await claimEvent(cycle.id, event.key)) continue; // already sent, or claimed by another process
 
             try {
                 await event.run(cycle, data);
@@ -129,7 +149,7 @@ const runOnce = async (now = new Date()) => {
                 console.log(`[SCHEDULER] ✉️ ${event.key} inviato per il ciclo #${cycle.id} (${cycle.name})`);
             } catch (e) {
                 console.error(`[SCHEDULER] Invio di ${event.key} per il ciclo #${cycle.id} fallito:`, e.message);
-                await releaseEvent(cycle.id, event.key); // si riproverà al giro successivo
+                await releaseEvent(cycle.id, event.key); // it will be retried on the next round
             }
         }
     }

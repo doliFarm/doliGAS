@@ -1,6 +1,26 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /* src/components/ui-kit.jsx v3.1
-   INCLUDE: Button, Input, Select, Card, Modal, Badge, Progress, Toast.
-   FIX: Forzato locale it-IT su Input per correggere formato date mobile/desktop.
+  INCLUDES: Button, Input, Select, Card, Modal, Badge, Progress, Toast.
+  FIX: it-IT locale forced on Input to fix the date format on mobile/desktop.
 */
 
 import React, { useEffect } from 'react';
@@ -37,7 +57,7 @@ export const Input = ({ label, error, className = '', icon: Icon, ...props }) =>
     <div className="relative">
         {Icon && <Icon className="absolute left-3 top-3 text-slate-400" size={18}/>}
         <input 
-          lang="it-IT" // FIX: Forza il browser a mostrare date in formato italiano
+          lang="it-IT" // FIX: force the browser to show dates in Italian format
           className={`w-full p-2.5 ${Icon ? 'pl-10' : ''} bg-white border rounded-xl outline-none transition-all ${error ? 'border-red-500 focus:ring-red-200' : 'border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100'} ${className}`}
           {...props}
         />
@@ -60,7 +80,7 @@ export const Select = ({ label, options = [], className = '', ...props }) => (
   </div>
 );
 
-// --- COMPONENTI VISUALI ---
+// --- VISUAL COMPONENTS ---
 
 export const Badge = ({ children, color = 'slate', className = '' }) => {
     const colors = {
@@ -126,7 +146,7 @@ export const Modal = ({ isOpen, onClose, title, children }) => {
   );
 };
 
-// --- TOAST INTELLIGENTE ---
+// --- SMART TOAST ---
 export const Toast = ({ message, type = 'info', onClose, duration = 4000 }) => {
   const styles = {
     success: 'bg-emerald-600 text-white',

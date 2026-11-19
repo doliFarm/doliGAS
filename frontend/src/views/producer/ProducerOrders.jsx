@@ -1,3 +1,23 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * @file frontend/src/views/producer/ProducerOrders.jsx
  * @version v1.0.0
@@ -26,7 +46,7 @@ export const ProducerOrders = () => {
   const fetchData = async () => {
     try {
       const res = await axios.get('/api/products');
-      // Filtriamo solo i prodotti che hanno ordini > 0
+      // Keep only the products with orders > 0
       const orderedItems = (res.data.products || []).filter(p => p.ordered_qty > 0);
       setItems(orderedItems);
       setIsLocked(res.data.isLocked || false);
@@ -40,9 +60,9 @@ export const ProducerOrders = () => {
 
   useEffect(() => { fetchData(); }, []);
 
-  // Quantità proposta per un prodotto: quella già confermata in questo ciclo
-  // (producer_cycle_supply), altrimenti tutto l'ordinato dai soci.
-  // Lo stock del listino non c'entra: è il tetto degli ordini, non la fornitura.
+  // Proposed quantity for a product: the one already confirmed in this cycle
+  // (producer_cycle_supply), otherwise everything the members ordered.
+  // The price list stock is not involved: it caps the orders, it is not the supply.
   const defaultQty = (item) =>
     (item.confirmed_qty !== null && item.confirmed_qty !== undefined) ? Number(item.confirmed_qty) : Number(item.ordered_qty);
 
@@ -50,16 +70,16 @@ export const ProducerOrders = () => {
     if (isLocked) return;
 
     setSaving(true);
-    // Prepariamo gli aggiornamenti
-    // Se un prodotto non è stato toccato, lo "riconfermiamo" con la sua quantità attuale (conferma salvata o ordinato)
-    // Questo serve per dare un segnale esplicito di "Check-in"
+    // Prepare the updates
+    // If a product was not touched, "reconfirm" it with its current quantity (saved confirmation or ordered)
+    // This gives an explicit "check-in" signal
     const updates = items.map(item => {
-        // Quantità decisa dall'utente (changes) oppure quella calcolata attuale
+        // Quantity chosen by the user (changes) or the current computed one
         const userQty = changes[item.id];
         
-        // Logica Default:
-        // Se c'è una modifica esplicita -> usa quella
-        // Altrimenti -> conferma già salvata per il ciclo, o in mancanza l'ordinato
+        // Default logic:
+        // If there is an explicit change -> use it
+        // Otherwise -> the confirmation already saved for the cycle, or else the ordered quantity
         let finalQty = userQty !== undefined 
             ? userQty 
             : defaultQty(item);
@@ -67,20 +87,20 @@ export const ProducerOrders = () => {
         return {
             id: item.id,
             price: item.price,
-            stock: finalQty, // Quantità che intendiamo consegnare (finisce in producer_cycle_supply)
+            stock: finalQty, // Quantity we intend to deliver (stored in producer_cycle_supply)
             is_active: 1,
             min_order_qty: item.min_order_qty
         };
     });
 
     try {
-      // Endpoint dedicato: la conferma della fornitura avviene dopo la chiusura del
-      // mercato, quando il listino è bloccato, quindi non passa da /api/products/bulk
+      // Dedicated endpoint: the supply confirmation happens after the market closes,
+      // when the price list is locked, so it does not go through /api/products/bulk
       await axios.post('/api/products/confirm-supply', {
         items: updates.map(u => ({ id: u.id, qty: u.stock }))
       });
       setToast({ type: 'success', message: 'Fornitura confermata!' });
-      await fetchData(); // Ricarica per vedere i dati aggiornati dal server
+      await fetchData(); // Reload to see the updated data from the server
     } catch (err) {
       setToast({ type: 'error', message: 'Errore durante la conferma' });
     } finally {
@@ -88,7 +108,7 @@ export const ProducerOrders = () => {
     }
   };
 
-  // Calcolo Totali per Header
+  // Totals for the header
   const totalRevenue = items.reduce((acc, item) => {
       let qty = changes[item.id];
       if (qty === undefined) {
@@ -115,7 +135,7 @@ export const ProducerOrders = () => {
     <div className="pb-24 space-y-6 animate-in fade-in">
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-      {/* RIEPILOGO HEADER */}
+      {/* SUMMARY HEADER */}
       <div className={`text-white p-6 rounded-3xl shadow-xl flex justify-between items-center transition-colors ${isLocked ? 'bg-slate-700 shadow-slate-300' : 'bg-slate-900 shadow-slate-200'}`}>
         <div>
           <div className="flex items-center gap-2 mb-1">
@@ -142,27 +162,27 @@ export const ProducerOrders = () => {
         </div>
       )}
 
-      {/* LISTA ARTICOLI */}
+      {/* ITEM LIST */}
       <div className="space-y-3">
         {items.map(item => {
-          // Logica Visualizzazione Valore Input
+          // Input value display logic
           let displayQty;
           if (changes[item.id] !== undefined) {
-              // 1. Modifica utente in corso (non ancora salvata)
+              // 1. User change in progress (not saved yet)
               displayQty = changes[item.id];
           } else {
-              // 2. Dati dal DB: la conferma già salvata per il ciclo, altrimenti l'ordinato
+              // 2. Data from the DB: the confirmation already saved for the cycle, otherwise the ordered quantity
               displayQty = defaultQty(item);
           }
 
-          // Evidenzia se diverso dall'ordinato
+          // Highlight if different from the ordered quantity
           const isModified = displayQty != item.ordered_qty;
 
           return (
             <Card key={item.id} className={`p-4 border-l-4 ${isModified ? 'border-l-amber-500 bg-amber-50/20' : 'border-l-slate-200'}`}>
               <div className="flex items-center justify-between gap-4">
                 
-                {/* INFO PRODOTTO */}
+                {/* PRODUCT INFO */}
                 <div className="flex-1 min-w-0">
                   <h3 className="font-bold text-slate-800 text-sm truncate">{item.name}</h3>
                   <div className="flex items-center gap-2 mt-1">
@@ -171,10 +191,10 @@ export const ProducerOrders = () => {
                   </div>
                 </div>
 
-                {/* CONFRONTO QUANTITÀ */}
+                {/* QUANTITY COMPARISON */}
                 <div className="flex items-center gap-4 shrink-0">
                     
-                    {/* Richiesto */}
+                    {/* Requested */}
                     <div className="text-right hidden sm:block">
                         <div className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">RICHIESTO</div>
                         <div className="text-lg font-black text-slate-400">{item.ordered_qty}</div>
@@ -182,7 +202,7 @@ export const ProducerOrders = () => {
 
                     <ArrowRight className="text-slate-300 hidden sm:block" size={16} />
 
-                    {/* In Consegna */}
+                    {/* To be delivered */}
                     <div className="text-right">
                         <div className={`text-[9px] font-bold uppercase tracking-wider mb-0.5 ${isModified ? 'text-amber-600' : 'text-emerald-600'}`}>
                             {isLocked ? 'CONSEGNATO' : 'CONFERMO'}

@@ -1,18 +1,38 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /* =============================================================================
-   FILE: backend/routes/admin/dashboard.js - v2.1
-   STATUS: Integro, Completo, Robusto.
-   DESC: API statistiche per la Dashboard del Coordinatore.
-   FIX: Risolto errore 500 acquisendo il pool DB dinamicamente.
-   ============================================================================= */
+  FILE: backend/routes/admin/dashboard.js - v2.1
+  DESC: statistics API for the Coordinator dashboard.
+  FIX: error 500 resolved by acquiring the DB pool dynamically.
+  =============================================================================
+*/
 
 const express = require('express');
 const router = express.Router();
 const { verifyGasMembership } = require('../../middlewares/roles');
 
-// Helper interno per coerenza
+// Internal helper, for consistency
 const getDb = () => global.pool || require('../../config/db');
 
-// Applichiamo la protezione per il GAS selezionato
+// Apply the protection for the selected GAS
 router.use(verifyGasMembership('Coordinatore'));
 
 // --- 1. KPI STATS ---
@@ -38,14 +58,14 @@ router.get('/stats', async (req, res) => {
     }
 });
 
-// --- 2. ANALYTICS (Grafici) ---
+// --- 2. ANALYTICS (charts) ---
 router.get('/analytics', async (req, res) => {
     const gasId = req.user.verifiedGasId;
     const { startDate, endDate } = req.query;
     const pool = getDb();
 
     try {
-        // Vendite per Produttore
+        // Sales by producer
         const [byProducer] = await pool.execute(`
             SELECT pr.business_name as name, SUM(COALESCE(oi.qty_received, oi.quantity) * oi.price_at_order) as value
             FROM order_items oi
@@ -56,7 +76,7 @@ router.get('/analytics', async (req, res) => {
             GROUP BY pr.id
         `, [gasId, startDate, endDate]);
 
-        // Vendite per Categoria
+        // Sales by category
         const [byCategory] = await pool.execute(`
             SELECT c.name, SUM(COALESCE(oi.qty_received, oi.quantity) * oi.price_at_order) as value
             FROM order_items oi
@@ -67,7 +87,7 @@ router.get('/analytics', async (req, res) => {
             GROUP BY c.id
         `, [gasId, startDate, endDate]);
 
-        // Prodotti Top
+        // Top products
         const [byProduct] = await pool.execute(`
             SELECT p.name, pr.business_name as producer, SUM(COALESCE(oi.qty_received, oi.quantity) * oi.price_at_order) as value
             FROM order_items oi

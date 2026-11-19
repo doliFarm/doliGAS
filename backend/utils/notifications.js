@@ -1,3 +1,23 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * @file backend/utils/notifications.js
  * @version v1.0.0
@@ -10,7 +30,7 @@
 const { sendEmail } = require('../emailService');
 const getDb = () => global.pool || require('../config/db');
 
-// Fallback templates hardcoded per sicurezza (se il DB è vuoto o query fallisce)
+// Hardcoded fallback templates, for safety (empty DB or failed query)
 const FALLBACK_TEMPLATES = {
     'G1_OPEN': { sub: 'Apertura Listini', body: 'Aggiorna i tuoi prodotti per {{cycle_name}}.' },
     'G3_SHOP_OPEN': { sub: 'Apertura Ordini', body: 'Puoi ordinare per {{cycle_name}} fino al {{close_date}}.' },
@@ -19,7 +39,7 @@ const FALLBACK_TEMPLATES = {
 };
 
 /**
- * Recupera e compila un template
+ * Loads and fills a template
  */
 const getCompiledTemplate = async (gasId, eventKey, data) => {
     const pool = getDb();
@@ -35,13 +55,13 @@ const getCompiledTemplate = async (gasId, eventKey, data) => {
             subject = rows[0].subject;
             body = rows[0].body;
         } else {
-            // Usa fallback
+            // Use the fallback
             const fb = FALLBACK_TEMPLATES[eventKey] || { sub: 'Avviso GAS', body: 'Nuova notifica dal GAS.' };
             subject = fb.sub;
             body = fb.body;
         }
 
-        // Sostituzione Variabili {{key}}
+        // Replace {{key}} variables
         Object.keys(data).forEach(key => {
             const regex = new RegExp(`{{${key}}}`, 'g');
             subject = subject.replace(regex, data[key]);
@@ -57,12 +77,12 @@ const getCompiledTemplate = async (gasId, eventKey, data) => {
 };
 
 /**
- * Invia notifica singola (Core Function)
+ * Sends a single notification (core function)
  */
 const sendNotification = async ({ userId, gasId, subject, message, type = 'info', emailTarget = null }) => {
     const pool = getDb();
     
-    // 1. Canale Database (Priorità Massima - Transazionale implicita)
+    // 1. Database channel (highest priority)
     try {
         if (userId) {
             await pool.execute(
@@ -73,32 +93,32 @@ const sendNotification = async ({ userId, gasId, subject, message, type = 'info'
         }
     } catch (e) {
         console.error("[NOTIF_ENGINE] DB Write Error:", e.message);
-        // Non blocchiamo: proviamo comunque a mandare email
+        // Do not block: still try to send the email
     }
 
-    // 2. Canale Email (Fail-safe)
+    // 2. Email channel (fail-safe)
     if (emailTarget) {
         try {
             await sendEmail(emailTarget, `[doliGAS] ${subject}`, message);
         } catch (e) {
             console.error(`[NOTIF_ENGINE] Email Failed to ${emailTarget}:`, e.message);
-            // Non rilanciamo l'errore per non bloccare il loop del chiamante
+            // Do not rethrow, so the caller's loop is not interrupted
         }
     }
 
-    // 3. Canale WhatsApp (Placeholder per implementazione futura)
+    // 3. WhatsApp channel (placeholder for a future implementation)
     // if (phoneTarget) { await sendWhatsapp(...) }
 };
 
-// --- FUNZIONI DI GRUPPO ---
+// --- GROUP FUNCTIONS ---
 
 const notifyAllMembers = async (gasId, eventKey, data) => {
     const pool = getDb();
     const { subject, body } = await getCompiledTemplate(gasId, eventKey, data);
 
     try {
-        // Destinatari: chi può fare la spesa, cioè Soci (3) e Coordinatori (1).
-        // I Produttori (2) hanno le loro notifiche: non ricevono gli avvisi del mercato.
+        // Recipients: whoever can shop, i.e. Members (3) and Coordinators (1).
+        // Producers (2) have their own notifications: they do not get the market notices.
         const [users] = await pool.execute(`
             SELECT u.id, u.email FROM users u 
             JOIN gas_memberships gm ON u.id = gm.user_id 

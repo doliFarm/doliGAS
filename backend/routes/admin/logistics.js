@@ -1,29 +1,48 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
- * doliGAS - Enterprise Resource Planning per Gruppi di Acquisto Solidale
- * Modulo Logistica e Gestione Distribuzione
+ * doliGAS - Logistics and distribution module
  * -----------------------------------------------------------------------------
  * FILE: backend/routes/admin/logistics.js
- * STATUS: Integro, Completo, Robusto.
- * DESC: Gestisce G6 (Check-in/Pesi) e G7 (Distribuzione/Consegna).
- * FEATURES: Ripartizione proporzionale, Gestione Surplus, Audit Ledger Wallet.
+ * STATUS: Stable.
+ * DESC: handles G6 (check-in/weighing) and G7 (distribution/delivery).
+ * FEATURES: proportional split, surplus handling, wallet audit ledger.
  */
 
 const express = require('express');
 const router = express.Router();
 
 /**
- * Helper per acquisire il pool di connessioni singleton.
+ * Helper returning the singleton connection pool.
  */
 const getDb = () => global.pool || require('../../config/db');
 const { allocateProportionally } = require('../../utils/allocation');
 
 // =============================================================================
-// SEZIONE G6: RICEZIONE E PESATURA (CHECK-IN)
+// SECTION G6: RECEIVING AND WEIGHING (CHECK-IN)
 // =============================================================================
 
 /**
  * GET /api/admin/logistics/checkin/:cycleId
- * Riepilogo prodotti ordinati per la fase di pesatura.
+ * Summary of ordered products for the weighing phase.
  */
 router.get('/checkin/:cycleId', async (req, res) => {
     const pool = getDb();
@@ -58,14 +77,14 @@ router.get('/checkin/:cycleId', async (req, res) => {
 
 /**
  * POST /api/admin/logistics/checkin/bulk-update
- * Ripartizione proporzionale del peso totale ricevuto tra tutti i soci ordinanti.
- * ROBUSTEZZA: Utilizza transazioni per garantire coerenza tra pesi e portafogli.
+ * Proportional split of the total weight received among all ordering members.
+ * Uses a transaction to keep weights and wallets consistent.
  */
 router.post('/checkin/bulk-update', async (req, res) => {
     const pool = getDb();
     const conn = await pool.getConnection();
     const { cycleId, items } = req.body;
-    const gasId = req.user.verifiedGasId; // SICUREZZA: mai il gasId del body
+    const gasId = req.user.verifiedGasId; // SECURITY: never the gasId from the body
     const adminId = req.user.id;
 
     try {
@@ -79,7 +98,7 @@ router.post('/checkin/bulk-update', async (req, res) => {
                 throw new Error(`QUANTITA_NON_VALIDA: peso ricevuto non valido per il prodotto ID ${productId}`);
             }
 
-            // Recupera tutti gli item per quel prodotto in quel ciclo, più l'unità di misura
+            // Load all items for that product in that cycle, plus the unit of measure
             const [itemsToUpdate] = await conn.execute(`
                 SELECT oi.id, oi.quantity, oi.price_at_order, o.user_id, pu.is_discrete
                 FROM order_items oi
@@ -94,9 +113,9 @@ router.post('/checkin/bulk-update', async (req, res) => {
             if (itemsToUpdate.length === 0) continue;
 
             /**
-             * Ripartizione proporzionale con il metodo dei resti maggiori: la somma delle
-             * quote è esattamente il totale ricevuto, senza frazioni perse per arrotondamento.
-             * Le unità discrete (pezzi, bottiglie) sono ripartite in numeri interi.
+             * Proportional split with the largest remainder method: the shares add up
+             * exactly to the received total, with no fractions lost to rounding.
+             * Discrete units (pieces, bottles) are split into whole numbers.
              */
             const step = itemsToUpdate[0].is_discrete ? 1 : 0.01;
             const assignments = allocateProportionally(
@@ -126,12 +145,12 @@ router.post('/checkin/bulk-update', async (req, res) => {
 });
 
 // =============================================================================
-// SEZIONE G7: CONSEGNA E CHIUSURA (CHECK-OUT)
+// SECTION G7: DELIVERY AND CLOSING (CHECK-OUT)
 // =============================================================================
 
 /**
  * GET /api/admin/logistics/checkout-list/:cycleId
- * Elenco soci con ordini pronti per il ritiro.
+ * Members with orders ready for pickup.
  */
 router.get('/checkout-list/:cycleId', async (req, res) => {
     const pool = getDb();
@@ -157,7 +176,7 @@ router.get('/checkout-list/:cycleId', async (req, res) => {
 
 /**
  * GET /api/admin/logistics/receipt/:orderId
- * Dettaglio ordine per la generazione della ricevuta di consegna.
+ * Order details for the delivery receipt.
  */
 router.get('/receipt/:orderId', async (req, res) => {
     const pool = getDb();
@@ -189,23 +208,23 @@ router.get('/receipt/:orderId', async (req, res) => {
 
 /**
  * POST /api/admin/logistics/checkout/deliver
- * Finalizza l'ordine con il CONGUAGLIO sul peso reale e sposta lo stato a 'delivered'.
- * Modello wallet: l'importo ordinato è già stato scalato al momento dell'ordine
- * (routes/members.js). Qui si regola solo la differenza tra totale reale e totale ordinato:
- *   - differenza > 0 -> addebito aggiuntivo (SPESA)
- *   - differenza < 0 -> restituzione al socio (REFUND)
+ * Finalizes the order with the ADJUSTMENT on the real weight and moves its status to 'delivered'.
+ * Wallet model: the ordered amount was already charged when the order was placed
+ * (routes/members.js). Here only the difference between real total and ordered total is settled:
+ *   - difference > 0 -> additional charge (SPESA)
+ *   - difference < 0 -> refund to the member (REFUND)
  */
 router.post('/checkout/deliver', async (req, res) => {
     const pool = getDb();
     const conn = await pool.getConnection();
     const { orderId } = req.body;
-    const gasId = req.user.verifiedGasId; // SICUREZZA: mai il gasId del body
+    const gasId = req.user.verifiedGasId; // SECURITY: never the gasId from the body
     const adminId = req.user.id;
 
     try {
         await conn.beginTransaction();
 
-        // 1. Recupero dati ordine e item per ricalcolo finale
+        // 1. Load order and items for the final recalculation
         const [orderRows] = await conn.execute("SELECT user_id, status, total_amount FROM orders WHERE id = ? AND gas_id = ? FOR UPDATE", [orderId, gasId]);
         if (orderRows.length === 0) throw new Error("Ordine non trovato.");
         if (orderRows[0].status === 'delivered') throw new Error("Ordine già consegnato.");
@@ -213,7 +232,7 @@ router.post('/checkout/deliver', async (req, res) => {
 
         const [items] = await conn.execute("SELECT qty_received, quantity, price_at_order FROM order_items WHERE order_id = ?", [orderId]);
 
-        // Calcolo in centesimi per evitare errori di arrotondamento
+        // Compute in cents to avoid rounding errors
         const toCents = (v) => Math.round(parseFloat(v) * 100);
         const realTotalCents = items.reduce((sum, it) => {
             const qty = parseFloat(it.qty_received ?? it.quantity);
@@ -223,7 +242,7 @@ router.post('/checkout/deliver', async (req, res) => {
         const chargedTotal = toCents(orderRows[0].total_amount) / 100;
         const adjustment = (realTotalCents - toCents(orderRows[0].total_amount)) / 100;
 
-        // 2. Conguaglio Wallet Socio (solo la differenza, con traccia nel registro movimenti)
+        // 2. Member wallet adjustment (only the difference, recorded in the transaction log)
         if (adjustment !== 0) {
             await conn.execute(
                 "UPDATE gas_memberships SET balance = balance - ?, updated_at = NOW(), updated_by = ? WHERE user_id = ? AND gas_id = ?",
@@ -241,7 +260,7 @@ router.post('/checkout/deliver', async (req, res) => {
             `, [gasId, orderRows[0].user_id, -adjustment, txType, description, adminId]);
         }
 
-        // 3. Aggiornamento stato ordine
+        // 3. Update the order status
         await conn.execute("UPDATE orders SET status = 'delivered', total_amount = ?, updated_at = NOW(), updated_by = ? WHERE id = ?", [realTotal, adminId, orderId]);
 
         await conn.commit();
@@ -257,12 +276,12 @@ router.post('/checkout/deliver', async (req, res) => {
 });
 
 // =============================================================================
-// SEZIONE UTILITY E SURPLUS
+// UTILITY AND SURPLUS SECTION
 // =============================================================================
 
 /**
  * POST /api/admin/logistics/handle-surplus
- * Registra merce ricevuta in eccesso (non ordinata da nessuno).
+ * Records goods received in excess (not ordered by anyone).
  */
 router.post('/handle-surplus', async (req, res) => {
     const pool = getDb();

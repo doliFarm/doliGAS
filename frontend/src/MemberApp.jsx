@@ -1,9 +1,29 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * @file frontend/src/MemberApp.jsx
  * @version v1.1.3
  * @author Luigi GRILLO @ doliFarm.com
  * @description Main Layout for Members. Updated with Logout button in bottom fixed navigation.
- * @status Integro, Completo, Robusto.
+ * @status Stable
  * @date 2026-02-23
  */
 
@@ -26,16 +46,16 @@ export const MemberApp = () => {
   const location = useLocation();
   const navigate = useNavigate();
   
-  // STATI MODALI
+  // MODAL STATE
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   
-  // STATO MENU UTENTE
+  // USER MENU STATE
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
-  // Gestione chiusura menu al click esterno
+  // Close the menu on an outside click
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
@@ -70,10 +90,10 @@ export const MemberApp = () => {
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden font-sans">
       
-      {/* SIDEBAR DESKTOP (Uniformata con il nuovo design compatto) */}
+      {/* DESKTOP SIDEBAR (aligned with the new compact design) */}
       <aside className="hidden md:flex flex-col w-72 bg-white border-r border-slate-100 h-[100dvh] z-20">
         
-        {/* HEADER LOGO CON SWITCHER INCORPORATO */}
+        {/* LOGO HEADER WITH BUILT-IN SWITCHER */}
         <div className="px-5 py-4 flex items-center justify-between border-b border-slate-50 shrink-0">
           <div className="flex items-center gap-2.5 overflow-hidden">
             <div className="p-1.5 bg-emerald-600 rounded-lg text-white shadow-md shadow-emerald-100 shrink-0">
@@ -84,7 +104,7 @@ export const MemberApp = () => {
                 <span className="font-black text-slate-800 text-lg tracking-tighter italic leading-none">
                   doliGAS
                 </span>
-                {/* Switcher: Aggiunto shrink-0 per evitare che venga compresso */}
+                {/* Switcher: shrink-0 added so it is not squeezed */}
                 {profiles?.length > 1 && (
                   <button 
                     onClick={handleSwitchContext}
@@ -143,7 +163,7 @@ export const MemberApp = () => {
         </div>
       </aside>
 
-      {/* CONTENUTO PRINCIPALE */}
+      {/* MAIN CONTENT */}
       <div className="flex-1 flex flex-col min-w-0 h-full relative">
         
         {/* HEADER */}
@@ -206,7 +226,7 @@ export const MemberApp = () => {
           </div>
         </header>
 
-        {/* VIEWPORT PRINCIPALE */}
+        {/* MAIN VIEWPORT */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-8 pb-24 flex flex-col">
           <div className="flex-1">
               <Outlet />
@@ -224,10 +244,10 @@ export const MemberApp = () => {
           </footer>
         </main>
 
-        {/* BOTTOM NAVIGATION MOBILE (Aggiornata con tasto Esci) */}
+        {/* MOBILE BOTTOM NAVIGATION (updated with the Exit button) */}
         <nav className="md:hidden fixed bottom-0 left-0 w-full bg-white/95 backdrop-blur-md border-t border-slate-200 pb-safe z-40 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
           <div className="flex justify-around items-center h-16">
-            {/* Rotte NavItems */}
+            {/* NavItems routes */}
             {navItems.map((item) => (
               <NavLink 
                 key={item.path} 
@@ -245,7 +265,7 @@ export const MemberApp = () => {
               </NavLink>
             ))}
 
-            {/* PULSANTE ESCI (Azione Logout) */}
+            {/* EXIT BUTTON (logout action) */}
             <button 
               onClick={logout}
               className="flex flex-col items-center justify-center w-full h-full space-y-1 text-slate-400 hover:text-red-500 transition-colors"
@@ -259,7 +279,7 @@ export const MemberApp = () => {
         </nav>
       </div>
 
-      {/* MODALI DI SISTEMA */}
+      {/* SYSTEM MODALS */}
       <Modal isOpen={showProfile} onClose={() => setShowProfile(false)} title={t('common.my_profile', 'Il mio Profilo')}>
          <div className="p-6">
             <UserProfileView />

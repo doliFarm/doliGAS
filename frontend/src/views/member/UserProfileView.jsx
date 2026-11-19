@@ -1,11 +1,31 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * @file frontend/src/views/member/UserProfileView.jsx
  * @version v2.2.1
  * @author Luigi GRILLO @ doliFarm.com
- * @description Componente Profilo Utente. 
- * STATUS: Integro, Completo, Robusto.
- * FIX: Ripristinata logica gasId (Anti-400) e visualizzazione Wallet.
- * CHANGES: Aggiunto footer con versione applicazione (doliGas Version).
+ * @description User profile component.
+ * STATUS: Stable.
+ * FIX: restored the gasId logic (anti-400) and the wallet display.
+ * CHANGES: added a footer with the application version (doliGas Version).
  */
 
 import React, { useState, useEffect } from 'react';
@@ -29,7 +49,7 @@ export const UserProfileView = () => {
   const [error, setError] = useState(null);
 
   const fetchProfile = async () => {
-    // Protezione contro caricamento asincrono del profilo
+    // Guard against the asynchronous loading of the profile
     if (!activeProfile?.context_id) {
       setLoading(false);
       return;
@@ -40,7 +60,7 @@ export const UserProfileView = () => {
       setError(null);
       const token = localStorage.getItem('doliGAS_token');
       
-      // Passiamo gasId per evitare l'errore 400 riscontrato in precedenza
+      // Pass gasId to avoid the 400 error seen earlier
       const res = await axios.get(
         `${API_URL}/api/members/profile?gasId=${activeProfile.context_id}`,
         { headers: { Authorization: `Bearer ${token}` } }
@@ -92,7 +112,7 @@ export const UserProfileView = () => {
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       
-      {/* 1. HEADER COMPATTO CON BADGE */}
+      {/* 1. COMPACT HEADER WITH BADGE */}
       <div className="flex items-center gap-4 bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
         <div className="w-16 h-16 rounded-2xl bg-emerald-500 flex items-center justify-center text-white text-2xl font-black shadow-lg shadow-emerald-100">
           {profile.first_name?.charAt(0)}
@@ -110,7 +130,7 @@ export const UserProfileView = () => {
         </div>
       </div>
 
-      {/* 2. WALLET BALANCE (Integrità: Ripristinato) */}
+      {/* 2. WALLET BALANCE (restored) */}
       <Card className="p-6 border-none bg-indigo-600 text-white shadow-xl shadow-indigo-100 rounded-[2rem] relative overflow-hidden">
         <div className="absolute top-0 right-0 p-16 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
         <div className="relative z-10">
@@ -125,7 +145,7 @@ export const UserProfileView = () => {
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* INFO PERSONALI */}
+        {/* PERSONAL INFO */}
         <Card className="p-4 shadow-sm border-slate-100">
           <h2 className="text-[11px] font-black text-slate-400 mb-4 flex items-center gap-2 uppercase tracking-[0.1em]">
             <User size={14} className="text-emerald-500"/> Dati Utente
@@ -136,7 +156,7 @@ export const UserProfileView = () => {
           </div>
         </Card>
 
-        {/* LOGISTICA */}
+        {/* LOGISTICS */}
         <Card className="p-4 shadow-sm border-slate-100">
           <h2 className="text-[11px] font-black text-slate-400 mb-4 flex items-center gap-2 uppercase tracking-[0.1em]">
             <MapPin size={14} className="text-blue-500"/> Logistica
@@ -147,7 +167,7 @@ export const UserProfileView = () => {
         </Card>
       </div>
 
-      {/* INFO MESSAGE & VERSION FOOTER (La tua richiesta) */}
+      {/* INFO MESSAGE & VERSION FOOTER */}
       <div className="bg-slate-100/50 p-4 rounded-2xl space-y-4">
         <div className="flex items-start gap-3 text-slate-500 text-xs leading-relaxed">
             <Info className="shrink-0 mt-0.5 text-slate-400" size={16}/>

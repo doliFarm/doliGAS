@@ -1,10 +1,30 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * @file backend/db/create-gas.js
- * @description Crea un nuovo GAS con il suo primo Coordinatore (installazione nuova o nuovo tenant).
- * Operazione transazionale: crea (o riusa) l'utente, il GAS, l'iscrizione come Coordinatore
- * e i template delle notifiche predefiniti.
+ * @description Creates a new GAS with its first Coordinator (new installation or new tenant).
+ * Transactional: creates (or reuses) the user, the GAS, the Coordinator membership
+ * and the default notification templates.
  *
- * Uso:
+ * Usage:
  *   npm run create-gas -- --name "GAS Fiesole" --slug fiesole \
  *        --admin-email mario@example.org --admin-first Mario --admin-last Rossi
  */

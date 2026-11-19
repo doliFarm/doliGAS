@@ -1,5 +1,5 @@
-# doliGAS - integrazione continua
-# Ad ogni push e pull request: test del backend su un MySQL vero e build del frontend.
+# doliGAS - continuous integration
+# On every push and pull request: backend tests on a real MySQL and frontend build.
 name: CI
 
 on:
@@ -9,7 +9,7 @@ on:
 
 jobs:
   backend:
-    name: Test del backend
+    name: Backend tests
     runs-on: ubuntu-latest
     services:
       mysql:
@@ -28,7 +28,7 @@ jobs:
       DB_PORT: 3306
       DB_USER: root
       DB_PASSWORD: root
-      # Con la password di root i test creano da soli il database doligas_test
+      # With the root password the tests create the doligas_test database themselves
       DB_ROOT_PASSWORD: root
     defaults:
       run:
@@ -39,15 +39,15 @@ jobs:
         with:
           node-version: 18
       - run: npm install --no-audit --no-fund
-      - name: Controllo della sintassi
+      - name: Syntax check
         run: find . -name '*.js' -not -path './node_modules/*' -print0 | xargs -0 -n1 node --check
       - run: npm test
 
   frontend:
-    name: Build del frontend
+    name: Frontend build
     runs-on: ubuntu-latest
-    # Stessa immagine del Dockerfile del frontend: package-lock.json è stato generato
-    # su Alpine e contiene solo il binario musl di Rollup, che su Ubuntu (glibc) manca
+    # Same image as the frontend Dockerfile: package-lock.json was generated on
+    # Alpine and only lists Rollup's musl binary, which is missing on Ubuntu (glibc)
     container: node:18-alpine
     defaults:
       run:
@@ -55,6 +55,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: npm install --no-audit --no-fund
-      - name: Le traduzioni sono JSON validi
+      - name: Translations are valid JSON
         run: for f in src/locales/*.json; do node -e "JSON.parse(require('fs').readFileSync('$f','utf8'))" || exit 1; done
       - run: npm run build

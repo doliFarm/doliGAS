@@ -1,9 +1,29 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /* =============================================================================
-   FILE: frontend/src/views/member/WalletView.jsx - v6.1
-   STATUS: Integro, Completo, Robusto.
-   DESC: Wallet Socio con supporto Multi-Context e IBAN dinamico.
-   FIX: Iniezione gasId e recupero impostazioni reali del GAS.
-   ============================================================================= */
+  FILE: frontend/src/views/member/WalletView.jsx - v6.1
+  DESC: Member wallet with multi-context support and dynamic IBAN.
+  FIX: gasId injected and real GAS settings loaded.
+  =============================================================================
+*/
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
@@ -17,15 +37,15 @@ import { useAuth } from '../../context/AuthContext'; // Import Context
 const API_URL = import.meta.env.VITE_API_URL || '';
 
 export const WalletView = () => {
-  const { activeProfile } = useAuth(); // Recupero Profilo
+  const { activeProfile } = useAuth(); // Load the profile
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [balance, setBalance] = useState(0);
   const [transactions, setTransactions] = useState([]);
   const pendingTopUp = transactions.find(tx => tx.status === 'pending' && parseFloat(tx.amount) > 0);
-  const [gasInfo, setGasInfo] = useState(null); // Stato per info GAS (IBAN)
+  const [gasInfo, setGasInfo] = useState(null); // State for the GAS info (IBAN)
   const [showTopUpInfo, setShowTopUpInfo] = useState(false);
-  // Dichiarazione di una ricarica: il coordinatore la deve approvare
+  // Top-up declaration: the coordinator must approve it
   const [topUpAmount, setTopUpAmount] = useState('');
   const [topUpNote, setTopUpNote] = useState('');
   const [sendingRequest, setSendingRequest] = useState(false);
@@ -39,20 +59,20 @@ export const WalletView = () => {
 
       try {
         setLoading(true);
-        // Fetch parallelo: Saldo, Storico e Info GAS
+        // Parallel fetch: balance, history and GAS info
         const [dashRes, txRes, settingsRes] = await Promise.all([
           axios.get(`${API_URL}/api/members/dashboard?gasId=${gasId}`),
           axios.get(`${API_URL}/api/members/wallet?gasId=${gasId}`),
-          // Nota: Usiamo la rotta pubblica o protetta per leggere l'IBAN del GAS
-          // Se non esiste una rotta pubblica, usiamo profile che contiene info GAS
+          // Note: use the public or protected route to read the GAS IBAN
+          // Without a public route, use profile, which contains the GAS info
           axios.get(`${API_URL}/api/members/profile?gasId=${gasId}`)
         ]);
         
         setBalance(dashRes.data.balance);
         setTransactions(txRes.data);
         
-        // Estraiamo info GAS dal profilo o da una chiamata dedicata se disponibile
-        // Per ora assumiamo che profile ritorni anche dati del GAS
+        // Extract the GAS info from the profile or from a dedicated call if available
+        // For now we assume profile also returns the GAS data
         setGasInfo(settingsRes.data); 
 
       } catch (err) {
@@ -62,14 +82,14 @@ export const WalletView = () => {
       }
     };
     fetchData();
-  }, [activeProfile, reloadKey]); // reloadKey: ricarica lo storico dopo una richiesta
+  }, [activeProfile, reloadKey]); // reloadKey: reloads the history after a request
 
   if (loading) return <div className="p-20 flex justify-center"><Loader2 className="animate-spin text-indigo-500" size={40}/></div>;
 
   return (
     <div className="pb-24 space-y-6 animate-in fade-in duration-500">
       
-      {/* 1. HERO CARD: SALDO */}
+      {/* 1. HERO CARD: BALANCE */}
       <div className="bg-gradient-to-br from-indigo-900 to-slate-900 rounded-3xl p-6 text-white shadow-xl shadow-indigo-200 relative overflow-hidden">
         <div className="absolute -top-10 -right-10 w-40 h-40 bg-indigo-500/20 rounded-full blur-3xl"></div>
         <div className="absolute bottom-0 left-0 w-32 h-32 bg-purple-500/20 rounded-full blur-3xl"></div>
@@ -94,7 +114,7 @@ export const WalletView = () => {
         </div>
       </div>
 
-      {/* 2. STORICO TRANSAZIONI */}
+      {/* 2. TRANSACTION HISTORY */}
       <div>
         <h3 className="text-lg font-black text-slate-800 mb-4 px-2 flex items-center gap-2">
           <History size={20} className="text-slate-400"/> {t('member_wallet.history_title')}
@@ -133,7 +153,7 @@ export const WalletView = () => {
         </Card>
       </div>
 
-      {/* 3. MODALE RICARICA: dati per il versamento e dichiarazione al coordinatore */}
+      {/* 3. TOP-UP MODAL: payment details and declaration to the coordinator */}
       <Modal isOpen={showTopUpInfo} onClose={() => setShowTopUpInfo(false)} title={t('member_wallet.topup_info_title')}>
         <div className="p-4 space-y-6">
           <div className="flex items-start gap-4">
@@ -150,14 +170,14 @@ export const WalletView = () => {
 
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
             <p className="text-xs font-bold text-slate-400 uppercase mb-2">{t('member_wallet.iban_label')}</p>
-            {/* IBAN DINAMICO: Se non c'è nel DB, mostra placeholder */}
+            {/* DYNAMIC IBAN: if it is not in the DB, show a placeholder */}
             <p className="font-mono text-lg font-black text-slate-800 select-all">
                 {gasInfo?.iban || "IBAN NON CONFIGURATO DAL GAS"}
             </p>
             <p className="text-xs text-slate-500 mt-2 italic">{t('member_wallet.iban_note')}</p>
           </div>
 
-          {/* Dichiarazione della ricarica: crea una richiesta in attesa di approvazione */}
+          {/* Top-up declaration: creates a request awaiting approval */}
           {pendingTopUp ? (
             <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl text-sm text-amber-800">
               {t('member_wallet.topup_pending', 'Hai già una ricarica in attesa di approvazione:')}{' '}

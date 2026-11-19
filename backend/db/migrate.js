@@ -1,22 +1,42 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * @file backend/db/migrate.js
- * @description Motore delle migrazioni del database doliGAS.
+ * @description doliGAS database migration engine.
  *
- * - Le migrazioni sono file SQL in backend/db/migrations, chiamati NNN_descrizione.sql
- *   ed eseguiti in ordine numerico una sola volta.
- * - Quelle già applicate sono registrate nella tabella `schema_migrations`.
- * - DATABASE ESISTENTE (es. la demo, creata prima delle migrazioni): se la tabella
- *   `schema_migrations` è vuota ma il database contiene già le tabelle dell'app,
- *   la migrazione 001 (schema iniziale) viene registrata come "baseline" senza eseguirla.
- * - Un lock MySQL (GET_LOCK) impedisce esecuzioni concorrenti.
+ * - Migrations are SQL files in backend/db/migrations, named NNN_description.sql
+ *   and run once, in numeric order.
+ * - Applied migrations are recorded in the `schema_migrations` table.
+ * - EXISTING DATABASE (e.g. the demo, created before migrations existed): if
+ *   `schema_migrations` is empty but the database already has the app tables,
+ *   migration 001 (initial schema) is recorded as "baseline" without running it.
+ * - A MySQL lock (GET_LOCK) prevents concurrent runs.
  *
- * Regole per scrivere una nuova migrazione:
- * - mai modificare un file già applicato: si aggiunge un nuovo file con il numero successivo;
- * - in MySQL le istruzioni DDL (CREATE/ALTER/DROP) non sono transazionali: tenere ogni
- *   migrazione piccola e focalizzata.
+ * Rules for writing a new migration:
+ * - never modify a file that has already been applied: add a new file with the next number;
+ * - in MySQL DDL statements (CREATE/ALTER/DROP) are not transactional: keep each
+ *   migration small and focused.
  *
- * Uso:  npm run migrate            (applica le migrazioni mancanti)
- *       npm run migrate -- --status (mostra lo stato senza modificare nulla)
+ * Usage:  npm run migrate            (applies the pending migrations)
+ *         npm run migrate -- --status (shows the status without changing anything)
  */
 const fs = require('fs');
 const path = require('path');
@@ -46,7 +66,7 @@ const connect = () => mysql.createConnection({
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
-    multipleStatements: true, // un file di migrazione contiene più istruzioni
+    multipleStatements: true, // a migration file contains several statements
     dateStrings: true
 });
 
@@ -67,7 +87,7 @@ const appTablesExist = async (conn) => {
 };
 
 /**
- * Applica le migrazioni mancanti. Restituisce l'elenco delle versioni applicate.
+ * Applies the pending migrations. Returns the list of applied versions.
  * @param {{ statusOnly?: boolean, log?: Function }} options
  */
 const migrate = async ({ statusOnly = false, log = console.log } = {}) => {
@@ -83,7 +103,7 @@ const migrate = async ({ statusOnly = false, log = console.log } = {}) => {
         const [rows] = await conn.query('SELECT version, file, checksum, is_baseline FROM schema_migrations ORDER BY version');
         const applied = new Map(rows.map(r => [r.version, r]));
 
-        // Baseline per i database creati prima dell'introduzione delle migrazioni
+        // Baseline for databases created before migrations were introduced
         if (applied.size === 0 && await appTablesExist(conn)) {
             const base = migrations.find(m => m.version === BASELINE_VERSION);
             if (!base) throw new Error(`Migrazione di baseline ${BASELINE_VERSION} non trovata`);
@@ -99,7 +119,7 @@ const migrate = async ({ statusOnly = false, log = console.log } = {}) => {
             }
         }
 
-        // Avviso se un file già applicato è stato modificato
+        // Warn if an already applied file has been modified
         for (const m of migrations) {
             const done = applied.get(m.version);
             if (done && done.checksum !== m.checksum) {
@@ -140,7 +160,7 @@ const migrate = async ({ statusOnly = false, log = console.log } = {}) => {
 
 module.exports = { migrate, listMigrations };
 
-// Esecuzione da riga di comando
+// Command line entry point
 if (require.main === module) {
     require('dotenv').config();
     migrate({ statusOnly: process.argv.includes('--status') })

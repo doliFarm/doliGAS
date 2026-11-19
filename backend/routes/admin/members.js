@@ -1,11 +1,31 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
- * doliGAS - Enterprise Resource Planning per GAS
+ * doliGAS
  * @file backend/routes/admin/members.js
  * @version v1.2.5
  * @author Luigi GRILLO @ doliFarm.com
- * @description Gestione Anagrafica Soci, Ruoli, Magic Links e Cassa.
- * STATUS: Integro, Completo, Robusto.
- * SCHEMA: v22.0 (Audit Tracing + Magic Links + Roles).
+ * @description Member registry, roles, magic links and cash.
+ * STATUS: Stable.
+ * SCHEMA: v22.0 (audit tracing + magic links + roles).
  */
 
 const express = require('express');
@@ -13,22 +33,22 @@ const router = express.Router();
 const crypto = require('crypto');
 
 /**
- * Helper per acquisire il pool di connessioni singleton.
+ * Helper returning the singleton connection pool.
  */
 const getDb = () => global.pool || require('../../config/db');
 
 /**
- * Helper interno per estrarre il gasId in modo robusto (Fallback multi-livello).
+ * Internal helper extracting the gasId from the request context.
  */
-// SICUREZZA: solo il gasId verificato dal middleware verifyGasMembership
+// SECURITY: only the gasId verified by the verifyGasMembership middleware
 const getGasId = (req) => req.user?.verifiedGasId;
 
 // =============================================================================
-// MIDDLEWARE DI PROTEZIONE (LOCKOUT PREVENTION)
+// PROTECTION MIDDLEWARE (LOCKOUT PREVENTION)
 // =============================================================================
 
 /**
- * Verifica che non si elimini o declassi l'ultimo Coordinatore attivo del GAS.
+ * Makes sure the last active Coordinator of the GAS is not deleted or demoted.
  */
 const checkLastAdminSafe = async (conn, gasId, targetUserId, newRoleId = null, isDeleteOrDeactivate = false) => {
     const [current] = await conn.execute(
@@ -36,13 +56,13 @@ const checkLastAdminSafe = async (conn, gasId, targetUserId, newRoleId = null, i
         [targetUserId, gasId]
     );
     
-    // Se l'utente non è un Coordinatore (role_id=1), l'operazione è sempre sicura
+    // If the user is not a Coordinator (role_id=1), the operation is always safe
     if (current.length === 0 || current[0].role_id !== 1) return true; 
     
     const staysAdmin = newRoleId !== null && parseInt(newRoleId) === 1;
     if (!isDeleteOrDeactivate && staysAdmin) return true;
 
-    // Conteggio admin attivi rimanenti
+    // Count of remaining active admins
     const [admins] = await conn.execute(
         "SELECT COUNT(*) as count FROM gas_memberships WHERE gas_id = ? AND role_id = 1 AND is_active = 1", 
         [gasId]
@@ -55,12 +75,12 @@ const checkLastAdminSafe = async (conn, gasId, targetUserId, newRoleId = null, i
 };
 
 // =============================================================================
-// 1. LETTURA DATI (MEMBERS & ROLES)
+// 1. READ DATA (MEMBERS & ROLES)
 // =============================================================================
 
 /**
  * GET /api/admin/members
- * Recupera l'elenco soci con statistiche ordini e saldo.
+ * Lists members with order statistics and balance.
  */
 router.get('/', async (req, res) => {
     const pool = getDb();
@@ -92,7 +112,7 @@ router.get('/', async (req, res) => {
 
 /**
  * GET /api/admin/roles
- * Recupera i ruoli disponibili nel sistema.
+ * Lists the roles available in the system.
  */
 router.get('/roles', async (req, res) => {
     const pool = getDb();
@@ -106,7 +126,7 @@ router.get('/roles', async (req, res) => {
 
 /**
  * GET /api/admin/members/:id
- * Dettaglio completo di un singolo socio.
+ * Full details of a single member.
  */
 router.get('/:id', async (req, res) => {
     const pool = getDb();
@@ -127,12 +147,12 @@ router.get('/:id', async (req, res) => {
 });
 
 // =============================================================================
-// 2. SCRITTURA DATI (UPSERT & MAGIC LINKS)
+// 2. WRITE DATA (UPSERT & MAGIC LINKS)
 // =============================================================================
 
 /**
  * POST /api/admin/members
- * Crea o aggiorna un socio (User + Membership).
+ * Creates or updates a member (user + membership).
  */
 router.post('/', async (req, res) => {
     const pool = getDb();
@@ -156,7 +176,7 @@ router.post('/', async (req, res) => {
         let targetUserId = id;
 
         if (id) {
-            // --- MODIFICA SOCIO ---
+            // --- EDIT MEMBER ---
             await checkLastAdminSafe(conn, gasId, id, role_id, activeStatus === 0);
             
             await conn.execute(
@@ -164,8 +184,8 @@ router.post('/', async (req, res) => {
                 [first_name, last_name, phone || null, cleanEmail, id]
             );
         } else {
-            // --- CREAZIONE NUOVO ---
-            // Verifica se l'utente esiste già nel sistema globale (es. iscritto ad un altro GAS)
+            // --- CREATE NEW ---
+            // Check whether the user already exists in the global registry (e.g. member of another GAS)
             const [exist] = await conn.execute("SELECT id FROM users WHERE email = ?", [cleanEmail]);
             
             if (exist.length > 0) {
@@ -180,7 +200,7 @@ router.post('/', async (req, res) => {
             }
         }
 
-        // Inserimento o Aggiornamento Membership (Audit Tracing v22.0)
+        // Insert or update the membership (audit tracing v22.0)
         await conn.execute(`
             INSERT INTO gas_memberships 
                 (user_id, gas_id, role_id, is_active, address, internal_notes, created_by, updated_by) 
@@ -208,7 +228,7 @@ router.post('/', async (req, res) => {
 });
 
 // =============================================================================
-// 3. AZIONI MASSIVE E ELIMINAZIONE
+// 3. BULK ACTIONS AND DELETION
 // =============================================================================
 
 /**

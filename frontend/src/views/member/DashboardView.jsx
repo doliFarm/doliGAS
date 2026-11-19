@@ -1,9 +1,29 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /* =============================================================================
-   FILE: frontend/src/views/member/DashboardView.jsx - v6.1
-   STATUS: Integro, Completo, Robusto.
-   DESC: Dashboard Socio con supporto Multi-Context.
-   FIX: Iniezione gasId per recuperare dati del GAS corretto.
-   ============================================================================= */
+  FILE: frontend/src/views/member/DashboardView.jsx - v6.1
+  DESC: Member dashboard with multi-context support.
+  FIX: gasId injected to load the data of the right GAS.
+  =============================================================================
+*/
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
@@ -15,7 +35,7 @@ import { Card, Button } from '../../components/ui-kit';
 import { useAuth } from '../../context/AuthContext'; // Context
 
 export const DashboardView = () => {
-  const { activeProfile } = useAuth(); // Recupero profilo
+  const { activeProfile } = useAuth(); // Load the profile
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -26,7 +46,7 @@ export const DashboardView = () => {
       
       try {
         const gasId = activeProfile.context_id;
-        // Passiamo gasId alla nuova rotta backend
+        // Pass gasId to the new backend route
         const res = await axios.get(`/api/members/dashboard?gasId=${gasId}`);
         setData(res.data);
       } catch (err) { 
@@ -64,7 +84,7 @@ export const DashboardView = () => {
         </div>
       </div>
 
-      {/* 2. MESSAGGI */}
+      {/* 2. MESSAGES */}
       {data.messages && data.messages.length > 0 && (
           <div className="space-y-3">
               <h3 className="text-sm font-black text-slate-400 uppercase tracking-wider px-2 flex items-center gap-2"><MessageSquare size={14}/> Avvisi dal Coordinatore</h3>

@@ -1,9 +1,29 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * @file backend/routes/products.js
  * @version v1.1.2
  * @author Luigi GRILLO @ doliFarm.com
- * @description Producer Area API. Fix: Rimossa colonna deleted_at inesistente che causava l'errore 500.
- * @status Integro, Completo, Robusto.
+ * @description Producer Area API. Fix: removed the nonexistent deleted_at column that caused error 500.
+ * @status Stable
  * @date 2026-02-24
  */
 
@@ -14,7 +34,7 @@ const getDb = () => global.pool || require('../config/db');
 
 router.use(authenticateToken);
 
-// --- HELPER CONTEXT ---
+// --- CONTEXT HELPER ---
 const getContext = async (userId, producerId = null) => {
     const pool = getDb();
     try {
@@ -36,8 +56,8 @@ const getContext = async (userId, producerId = null) => {
 };
 
 /**
- * SICUREZZA: il listino è bloccato tra la scadenza G2 (producers_deadline)
- * e la consegna del ciclo attivo. Fuori da un ciclo il produttore può modificarlo.
+ * SECURITY: the price list is locked between the G2 deadline (producers_deadline)
+ * and the delivery of the active cycle. Outside a cycle the producer can edit it.
  */
 const isListLocked = async (gasId) => {
     const pool = getDb();
@@ -50,8 +70,8 @@ const isListLocked = async (gasId) => {
 };
 
 /**
- * Restituisce il contesto produttore solo se l'utente può modificare il listino,
- * altrimenti invia la risposta di errore e restituisce null.
+ * Returns the producer context only if the user can edit the price list,
+ * otherwise sends the error response and returns null.
  */
 const getWritableContext = async (req, res, producerId) => {
     const context = await getContext(req.user.id, producerId);
@@ -77,7 +97,7 @@ const isListOpen = async (gasId) => {
 };
 
 // ==================================================================================
-// 1. LETTURA DATI (DASHBOARD & LISTINO)
+// 1. READ DATA (DASHBOARD & PRICE LIST)
 // ==================================================================================
 router.get('/dashboard-status', async (req, res) => {
     try {
@@ -93,7 +113,7 @@ router.get('/dashboard-status', async (req, res) => {
 
         let notifications = [];
         try {
-            // Aggiunto 'id' e filtro per messaggi non letti (is_read = 0 o NULL)
+            // Added 'id' and a filter for unread messages (is_read = 0 or NULL)
             const [msgs] = await pool.execute(`
                 SELECT id, title, message, created_at, target_profile 
                 FROM notifications 
@@ -118,13 +138,13 @@ router.get('/dashboard-status', async (req, res) => {
         const c = cycles[0];
         const now = new Date();
         
-        // --- LOGICA STATO ---
+        // --- STATUS LOGIC ---
         let state = 'WAITING';
         if (now >= new Date(c.start_at) && now < new Date(c.producers_deadline)) state = 'LIST_OPEN';
         else if (now >= new Date(c.producers_deadline) && now < new Date(c.market_close_at)) state = 'WAITING';
         else if (now >= new Date(c.market_close_at)) state = 'ORDERS_RECEIVED';
 
-        // --- NUOVA LOGICA: VERIFICA VALIDAZIONE LISTINO ---
+        // --- NEW LOGIC: PRICE LIST VALIDATION CHECK ---
         let isValidated = false;
         let validatedAt = null;
         try {
@@ -140,7 +160,7 @@ router.get('/dashboard-status', async (req, res) => {
             console.error("[PROD_DASH] Validation fetch error:", vErr.message);
         }
 
-        // --- RISPOSTA INTEGRATA ---
+        // --- COMBINED RESPONSE ---
         res.json({ 
             state, 
             message: state, 
@@ -167,7 +187,7 @@ router.get('/', async (req, res) => {
         const context = await getContext(req.user.id, req.query.producerId);
         if (!context) return res.status(403).json({ error: "Accesso negato" });
 
-        // 1. RECUPERO INFO CICLO E VALIDAZIONE (Nuova logica workflow)
+        // 1. LOAD CYCLE INFO AND VALIDATION (new workflow logic)
         const [cycles] = await pool.execute(`
             SELECT id, producers_deadline FROM cycles 
             WHERE gas_id = ? AND is_active = 1 AND delivery_at > NOW() 
@@ -180,10 +200,10 @@ router.get('/', async (req, res) => {
 
         if (cycles.length > 0) {
             cycleId = cycles[0].id;
-            // Verifichiamo se siamo oltre la deadline G2
+            // Check whether we are past the G2 deadline
             isListLocked = new Date() > new Date(cycles[0].producers_deadline);
 
-            // Verifichiamo se il produttore ha già validato per questo ciclo
+            // Check whether the producer has already validated for this cycle
             const [val] = await pool.execute(
                 "SELECT is_validated, validated_at FROM producer_cycle_validations WHERE producer_id = ? AND cycle_id = ?",
                 [context.producer_id, cycleId]
@@ -196,9 +216,9 @@ router.get('/', async (req, res) => {
         }
 
         /**
-         * 2. RECUPERO PRODOTTI con la quantità ordinata dai soci nel ciclo corrente.
-         * ordered_qty serve alla pagina "Ordini" del produttore (lista di preparazione):
-         * somma le quantità degli ordini confermati, senza contare quelli annullati o le bozze.
+         * 2. LOAD PRODUCTS with the quantity ordered by members in the current cycle.
+         * ordered_qty feeds the producer's "Orders" page (picking list):
+         * it sums confirmed orders, excluding cancelled orders and drafts.
          */
         const [products] = await pool.execute(`
             SELECT p.*, u.symbol as unit, c.name as category_name,
@@ -220,16 +240,16 @@ router.get('/', async (req, res) => {
         const [units] = await pool.execute("SELECT id, name, symbol FROM product_units ORDER BY name");
         const [categories] = await pool.execute("SELECT id, name FROM product_categories WHERE gas_id = ?", [context.gas_id]);
 
-        // 3. RISPOSTA COMPLETA
+        // 3. FULL RESPONSE
         res.json({ 
             products, 
             units, 
             categories, 
-            isListLocked, // Per retrocompatibilità con isListOpen
-            isLocked: isListLocked, // Nome usato dalla pagina Ordini del produttore
-            cycleId,      // Necessario per il tasto Valida
-            isValidated,  // Necessario per lo stato del tasto
-            validatedAt   // Opzionale, per info UI
+            isListLocked, // For backward compatibility with isListOpen
+            isLocked: isListLocked, // Name used by the producer's Orders page
+            cycleId,      // Needed by the Validate button
+            isValidated,  // Needed for the button state
+            validatedAt   // Optional, UI info
         });
 
     } catch (err) { 
@@ -240,7 +260,7 @@ router.get('/', async (req, res) => {
 
 /**
  * PATCH /api/products/messages/:id/read
- * Segna una notifica come letta in modo che non compaia più nella dashboard
+ * Marks a notification as read so it no longer shows up on the dashboard
  */
 router.patch('/messages/:id/read', async (req, res) => {
     const pool = getDb();
@@ -257,7 +277,7 @@ router.patch('/messages/:id/read', async (req, res) => {
 });
 
 // ==================================================================================
-// 2. SCRITTURA DATI (CRUD & BULK)
+// 2. WRITE DATA (CRUD & BULK)
 // ==================================================================================
 
 router.post('/', async (req, res) => {
@@ -267,21 +287,21 @@ router.post('/', async (req, res) => {
         const context = await getWritableContext(req, res, producerId);
         if (!context) return;
 
-        // 1. Catturiamo il risultato dell'INSERT
+        // 1. Capture the INSERT result
         const [result] = await pool.execute(`
             INSERT INTO products (producer_id, category_id, unit_id, name, price, stock, min_order_qty, is_active, created_by)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [context.producer_id, category_id || null, unit_id || 1, name, price, stock || null, min_order_qty || 1, is_active ? 1 : 0, req.user.id]
         );
         
-        // 2. Revoca della validazione
+        // 2. Revoke the validation
         await pool.execute(`
             DELETE v FROM producer_cycle_validations v
             JOIN cycles c ON v.cycle_id = c.id
             WHERE v.producer_id = ? AND c.is_active = 1 AND c.producers_deadline > NOW()
         `, [context.producer_id]);
         
-        // 3. Rispondiamo includendo l'ID appena generato
+        // 3. Respond including the newly generated ID
         res.json({ success: true, id: result.insertId });
         
     } catch (e) { 
@@ -299,7 +319,7 @@ router.put('/bulk', async (req, res) => {
         if (!Array.isArray(items)) return res.status(400).json({ error: "Formato dati non valido" });
         await conn.beginTransaction();
         
-        // 1. Eseguiamo gli aggiornamenti massivi
+        // 1. Run the bulk updates
         for (const item of items) {
             await conn.execute(`
                 UPDATE products 
@@ -309,7 +329,7 @@ router.put('/bulk', async (req, res) => {
             );
         }
         
-        // 2. Revoca della validazione DENTRO la transazione per massima sicurezza
+        // 2. Revoke the validation INSIDE the transaction, for safety
         await conn.execute(`
             DELETE v FROM producer_cycle_validations v
             JOIN cycles c ON v.cycle_id = c.id
@@ -318,9 +338,9 @@ router.put('/bulk', async (req, res) => {
             AND c.producers_deadline > NOW()
         `, [context.producer_id]);
 
-        // 3. Commit e risposta
+        // 3. Commit and respond
         await conn.commit();
-        res.json({ success: true }); // RISPOSTA INVIATA SOLO ALLA FINE
+        res.json({ success: true }); // RESPONSE SENT ONLY AT THE END
 
     } catch (e) { 
         await conn.rollback(); 
@@ -337,7 +357,7 @@ router.put('/:id', async (req, res) => {
         const context = await getWritableContext(req, res, producerId);
         if (!context) return;
         
-        // 1. Aggiornamento
+        // 1. Update
         await pool.execute(`
             UPDATE products SET 
                 name = ?, category_id = ?, unit_id = ?, price = ?, stock = ?, 
@@ -346,14 +366,14 @@ router.put('/:id', async (req, res) => {
             [name, category_id || null, unit_id || 1, price, stock || null, min_order_qty, is_active ? 1 : 0, req.user.id, req.params.id, context.producer_id]
         );
         
-        // 2. Revoca
+        // 2. Revoke
         await pool.execute(`
             DELETE v FROM producer_cycle_validations v
             JOIN cycles c ON v.cycle_id = c.id
             WHERE v.producer_id = ? AND c.is_active = 1 AND c.producers_deadline > NOW()
         `, [context.producer_id]);
 
-        // 3. Risposta
+        // 3. Respond
         res.json({ success: true });
 
     } catch (e) { 
@@ -367,17 +387,17 @@ router.delete('/:id', async (req, res) => {
         const context = await getWritableContext(req, res, req.query.producerId);
         if (!context) return;
         
-        // 1. Cancellazione
+        // 1. Delete
         await pool.execute("DELETE FROM products WHERE id = ? AND producer_id = ?", [req.params.id, context.producer_id]);
         
-        // 2. Revoca
+        // 2. Revoke
         await pool.execute(`
             DELETE v FROM producer_cycle_validations v
             JOIN cycles c ON v.cycle_id = c.id
             WHERE v.producer_id = ? AND c.is_active = 1 AND c.producers_deadline > NOW()
         `, [context.producer_id]);
 
-        // 3. Risposta
+        // 3. Respond
         res.json({ success: true });
 
     } catch (e) { 
@@ -398,14 +418,14 @@ router.get('/profile', async (req, res) => {
 
 /**
  * POST /api/products/confirm-supply
- * Il produttore conferma quanto consegnerà davvero di ogni prodotto, dopo la chiusura
- * del mercato (G4) e prima della consegna (G7).
+ * The producer confirms how much of each product will actually be delivered, after the
+ * market closes (G4) and before delivery (G7).
  *
- * È un endpoint separato da PUT /bulk di proposito: quello modifica il LISTINO e resta
- * bloccato dopo la scadenza G2, mentre questa conferma avviene proprio in quella finestra.
+ * It is deliberately separate from PUT /bulk: that one edits the PRICE LIST and stays
+ * locked after the G2 deadline, while this confirmation happens precisely in that window.
  *
- * La quantità confermata viene scritta in producer_cycle_supply, legata al ciclo:
- * products.stock resta la disponibilità del listino e non viene toccato.
+ * The confirmed quantity is written to producer_cycle_supply, tied to the cycle:
+ * products.stock stays the price list availability and is not touched.
  */
 router.post('/confirm-supply', async (req, res) => {
     const pool = getDb();
@@ -419,7 +439,7 @@ router.post('/confirm-supply', async (req, res) => {
         const context = await getContext(req.user.id, producerId);
         if (!context) return res.status(403).json({ error: "Contesto produttore non valido" });
 
-        // La conferma è possibile solo tra la chiusura del mercato e la consegna
+        // Confirmation is possible only between market closing and delivery
         const [cycles] = await pool.execute(`
             SELECT id, name FROM cycles
             WHERE gas_id = ? AND is_active = 1
@@ -439,8 +459,8 @@ router.post('/confirm-supply', async (req, res) => {
                 if (!Number.isFinite(qty) || qty < 0) {
                     throw new Error(`QUANTITA_NON_VALIDA: prodotto ID ${item.id}`);
                 }
-                // La SELECT su products garantisce che il prodotto sia di questo produttore.
-                // ON DUPLICATE: una nuova conferma sostituisce la precedente dello stesso ciclo.
+                // The SELECT on products guarantees that the product belongs to this producer.
+                // ON DUPLICATE: a new confirmation replaces the previous one for the same cycle.
                 const [r] = await conn.execute(`
                     INSERT INTO producer_cycle_supply (cycle_id, product_id, confirmed_qty, confirmed_by)
                     SELECT ?, p.id, ?, ? FROM products p WHERE p.id = ? AND p.producer_id = ?
@@ -466,7 +486,7 @@ router.post('/confirm-supply', async (req, res) => {
 
 /**
  * POST /api/products/validate-list
- * Permette al produttore di validare il proprio listino per il ciclo corrente.
+ * Lets the producer validate their price list for the current cycle.
  */
 router.post('/validate-list', async (req, res) => {
     const pool = getDb();
@@ -478,7 +498,7 @@ router.post('/validate-list', async (req, res) => {
     }
 
     try {
-        // Verifica che il produttore appartenga effettivamente all'utente
+        // Check that the producer actually belongs to the user
         const context = await getContext(userId, producerId);
         if (!context) return res.status(403).json({ error: "Accesso negato." });
 

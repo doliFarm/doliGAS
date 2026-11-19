@@ -1,15 +1,34 @@
+-- doliGAS - Solidarity purchasing group (GAS) management platform
+-- Copyright (C) 2026 Luigi Grillo (doliFarm)
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU Affero General Public License as published
+-- by the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-- GNU Affero General Public License for more details.
+--
+-- You should have received a copy of the GNU Affero General Public License
+-- along with this program.  If not, see <https://www.gnu.org/licenses/>.
+--
+-- SPDX-License-Identifier: AGPL-3.0-or-later
+
 -- =============================================================================
--- doliGAS - Soppressione degli eventi già passati dei cicli attivi
+-- doliGAS - Suppression of the already past events of active cycles
 --
--- Da eseguire UNA VOLTA, al primo avvio dello scheduler su un'installazione che
--- ha già cicli in corso. Senza questo, lo scheduler vede tappe con data passata
--- e mai notificate, e le recupera tutte insieme: i soci riceverebbero in blocco
--- avvisi vecchi ("il mercato è aperto", "chiude fra 3 ore") senza senso.
+-- Run it ONCE, when the scheduler starts for the first time on an installation
+-- that already has cycles in progress. Without it, the scheduler sees steps with
+-- a past date that were never notified and catches up on all of them at once:
+-- members would receive a batch of stale notices ("the market is open", "closes
+-- in 3 hours") that make no sense.
 --
--- Marca come già inviati solo gli eventi la cui data è passata. Le tappe future
--- restano in attesa e partiranno al momento giusto.
+-- Marks as sent only the events whose date has passed. Future steps stay
+-- pending and will go out at the right time.
 --
--- Uso (dalla cartella del progetto, con i container avviati):
+-- Usage (from the project folder, with the containers running):
 --   docker compose exec -T gashub-db sh -c \
 --     'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE"' \
 --     < backend/db/tools/sopprimi-eventi-passati.sql

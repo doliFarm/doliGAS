@@ -1,3 +1,23 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 export const gasConfig = {
   name: "GAS Fiesole",
   logoUrl: null, 
@@ -12,25 +32,25 @@ export const initialUser = {
   id: "u1",
   name: 'Marco',
   balance: 15.50,
-  isOrderConfirmed: false, // NUOVO STATO: true se l'ordine è chiuso
+  isOrderConfirmed: false, // NEW STATE: true if the order is closed
 
-  // BOZZA REMOTA
+  // REMOTE DRAFT
   remoteDraft: {
     exists: true,
     lastUpdated: '15/01/2026 10:30',
     items: [
-       // NOTA: Le quantità sono NUMERI (1.5), non stringhe ("1.5")
+       // NOTE: quantities are NUMBERS (1.5), not strings ("1.5")
        { producerId: 'p1', productId: 'prod2', quantity: 1.5, note: '' } 
     ]
   },
 
-  // ULTIMO ORDINE (Per la funzione Ripeti)
+  // LAST ORDER (for the Repeat function)
   lastOrder: {
     id: "ord-99",
     date: '15/12/2025',
     total: 34.00,
     items: [ 
-      // Aggiungo dettagli (name, price) per mostrarli nell'anteprima senza cercare nel catalogo
+      // Add details (name, price) to show them in the preview without looking them up in the catalog
       { producerId: 'p1', productId: 'prod1', quantity: 2, name: "Mele Golden", price: 2.50 }, 
       { producerId: 'p2', productId: 'prod3', quantity: 1, name: "Pane Integrale", price: 4.50 }  
     ]

@@ -1,9 +1,29 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * @file frontend/src/CoordinatorApp.jsx
  * @version v1.2.4
  * @author Luigi GRILLO @ doliFarm.com
- * @description Layout principale Coordinatore. Header ottimizzato (GAS [Nome]) e Ruolo nel menu a tendina.
- * @status Integro, Completo, Robusto.
+ * @description Main Coordinator layout. Header shows "GAS [Name]" and the role in the dropdown menu.
+ * @status Stable
  * @date 2026-02-24
  */
 
@@ -15,7 +35,7 @@ import { useAuth } from './context/AuthContext';
 import { 
   Menu, Bell, LayoutDashboard, Users, ShoppingBag, 
   Truck, LogOut, ChevronDown, User, Shield, FileText, RefreshCw,
-  Tractor // <-- Icona aggiunta per i Produttori
+  Tractor // <-- icon added for Producers
 } from 'lucide-react';
 import { Modal, Button } from './components/ui-kit';
 import { PrivacyContent, TermsContent } from './views/LegalViews';
@@ -28,7 +48,7 @@ export const CoordinatorApp = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // STATI UI
+  // UI STATE
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
@@ -37,7 +57,7 @@ export const CoordinatorApp = () => {
   
   const menuRef = useRef(null);
 
-  // Chiusura automatica del menu al click esterno
+  // Close the menu automatically on an outside click
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
@@ -72,7 +92,7 @@ export const CoordinatorApp = () => {
     return 'GASHUB ADMIN';
   };
 
-  // NavItems per la Bottom Bar Mobile - Inserito ADM_PROD
+  // NavItems for the mobile bottom bar - ADM_PROD added
   const navItems = [
     { label: t('common.nav.dashboard'), path: '/admin/dashboard', icon: LayoutDashboard },
     { label: t('common.nav.members'), path: '/admin/members', icon: Users },
@@ -83,7 +103,7 @@ export const CoordinatorApp = () => {
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden font-sans">
-      {/* SIDEBAR DESKTOP / DRAWER MOBILE */}
+      {/* DESKTOP SIDEBAR / MOBILE DRAWER */}
       <SidebarMenu 
         user={user} 
         onLogout={logout} 
@@ -126,7 +146,7 @@ export const CoordinatorApp = () => {
               {isUserMenuOpen && (
                 <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-2xl shadow-xl shadow-slate-200 border border-slate-100 overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-200">
                     <div className="p-4 border-b border-slate-50 bg-slate-50/50">
-                        {/* Nome con Ruolo accanto in Badge */}
+                        {/* Name with the role in a badge next to it */}
                         <div className="flex items-center gap-2 mb-0.5">
                           <p className="text-sm font-bold text-slate-800 truncate">{user?.first_name} {user?.last_name}</p>
                           <span className="shrink-0 text-[8px] font-black bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-md uppercase border border-emerald-200/50">
@@ -182,7 +202,7 @@ export const CoordinatorApp = () => {
           </footer>
         </main>
 
-        {/* BOTTOM NAVIGATION MOBILE */}
+        {/* MOBILE BOTTOM NAVIGATION */}
         <nav className="lg:hidden fixed bottom-0 left-0 w-full bg-white/95 backdrop-blur-md border-t border-slate-200 pb-safe z-40 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
           <div className="flex justify-around items-center h-16">
             {navItems.map((item) => (
@@ -206,7 +226,7 @@ export const CoordinatorApp = () => {
         </nav>
       </div>
 
-      {/* MODALI DI SISTEMA */}
+      {/* SYSTEM MODALS */}
       <Modal isOpen={showProfile} onClose={() => setShowProfile(false)} title={t('common.my_profile')}>
          <div className="p-6">
             <UserProfileView />

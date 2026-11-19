@@ -1,10 +1,30 @@
-/**
- * Eseguito una volta prima di tutti i test: crea il database di test (se manca)
- * e applica le migrazioni.
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
  *
- * Per creare il database serve un utente con i privilegi: se è disponibile la
- * password di root (DB_ROOT_PASSWORD, come nel .env del progetto) lo crea e dà i
- * permessi a DB_USER; altrimenti il database deve esistere già (come in CI).
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
+/**
+ * Runs once before all tests: creates the test database (if missing)
+ * and applies the migrations.
+ *
+ * Creating the database needs a privileged user: if the root password is available
+ * (DB_ROOT_PASSWORD, as in the project .env) it creates it and grants DB_USER
+ * access; otherwise the database must already exist (as in CI).
  */
 const mysql = require('mysql2/promise');
 const { applyTestEnv } = require('./testEnv');

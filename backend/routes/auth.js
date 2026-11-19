@@ -1,9 +1,29 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * @file  backend/routes/auth.js
  * @version v1.1.2
  * @author Luigi GRILLO @ doliFarm.com
  * @description Authentication Logic. Multi-Tenant context mapping, Dual-Role logic, and Enhanced Debugging.
- * @status Integro, Completo, Robusto.
+ * @status Stable
  * @date 2026-02-24
  */
 const express = require('express');
@@ -12,28 +32,28 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { sendEmail } = require('../emailService');
 
-// Helper DB Dinamico
+// Dynamic DB helper
 const getDb = () => global.pool || require('../config/db');
-const JWT_SECRET = process.env.JWT_SECRET; // Obbligatorio: verificato all'avvio in server.js
+const JWT_SECRET = process.env.JWT_SECRET; // Required: checked at startup in server.js
 
-// SICUREZZA: limite tentativi di verifica OTP (anti brute-force, in memoria)
+// SECURITY: limit on OTP verification attempts (anti brute force, in memory)
 const MAX_OTP_ATTEMPTS = 5;
-const otpAttempts = new Map(); // userId -> tentativi falliti
+const otpAttempts = new Map(); // userId -> failed attempts
 
-// --- 1. LOGIN (Richiesta Codice) ---
+// --- 1. LOGIN (code request) ---
 router.post('/login', async (req, res) => {
     const { contact, gasSlug } = req.body;
     const pool = getDb();
     /**
-     * Istanze dimostrative senza SMTP: il codice viene restituito nella risposta,
-     * perché non c'è nessun altro modo di riceverlo. Il frontend lo mostra nella
-     * console di debug. Vale SOLO con DEMO_SHOW_OTP=true, da non usare mai su
-     * un'installazione reale: chi conosce un indirizzo email potrebbe accedere
-     * come quella persona. Indipendente da ENABLE_DEBUG_API.
+     * Demo instances without SMTP: the code is returned in the response, because
+     * there is no other way to receive it. The frontend shows it in the debug
+     * console. Applies ONLY with DEMO_SHOW_OTP=true, never to be used on a real
+     * installation: anyone who knows an email address could log in as that
+     * person. Independent of ENABLE_DEBUG_API.
      */
     const showOtpInResponse = process.env.DEMO_SHOW_OTP === 'true';
     
-    // LOG SEMPRE ATTIVO PER TRACCIARE L'ARRIVO DELLA RICHIESTA
+    // ALWAYS-ON LOG TO TRACE INCOMING REQUESTS
     console.log(`[AUTH] 📩 Richiesta OTP per il GAS "${gasSlug}"`);
     
     if (!contact || !gasSlug) {
@@ -42,7 +62,7 @@ router.post('/login', async (req, res) => {
     }
 
     try {
-        // Query diagnostica: verifichiamo l'utente SENZA filtri is_active per capire se esiste
+        // Diagnostic query: look up the user WITHOUT is_active filters to see whether it exists
         const [checkRows] = await pool.execute(`
             SELECT u.id, u.email, g.name as gas_name, g.is_active as gas_active, gm.is_active as member_active
             FROM users u
@@ -51,7 +71,7 @@ router.post('/login', async (req, res) => {
             WHERE (u.email = ? OR u.phone = ?) AND g.slug = ?
         `, [contact, contact, gasSlug]);
         
-        // Se non troviamo nulla, logghiamo il fallimento specifico
+        // If nothing is found, log the specific failure
         if (checkRows.length === 0) {
             console.warn(`[AUTH] ⚠️ Nessun utente trovato per il contatto indicato nel GAS "${gasSlug}".`);
             return res.json({ success: true, message: 'Se i dati sono corretti, riceverai un codice.' });
@@ -59,25 +79,25 @@ router.post('/login', async (req, res) => {
 
         const user = checkRows[0];
 
-        // Se l'utente esiste ma è disattivato
+        // If the user exists but is disabled
         if (!user.gas_active || !user.member_active) {
             console.warn(`[AUTH] 🚫 Utente trovato ma NON ATTIVO. GAS_OK: ${user.gas_active}, MEMBER_OK: ${user.member_active}`);
             return res.json({ success: true, message: 'Se i dati sono corretti, riceverai un codice.' });
         }
 
-        // Se arriviamo qui, l'utente è valido e attivo
+        // Past this point the user is valid and active
         const code = crypto.randomInt(100000, 999999).toString();
-        const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minuti
+        const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
         await pool.execute("DELETE FROM magic_links WHERE user_id = ?", [user.id]);
         await pool.execute("INSERT INTO magic_links (user_id, token, expires_at) VALUES (?, ?, ?)", [user.id, code, expiresAt]);
 
-        // LOG CRUCIALE: Se vedi questo, il backend ha fatto il suo dovere
-        // SICUREZZA: il codice non va MAI scritto nei log
+        // KEY LOG: if you see this, the backend did its job
+        // SECURITY: the code must NEVER be written to the logs
         otpAttempts.delete(user.id);
         console.log(`[AUTH] 🔑 OTP generato per utente #${user.id}`);
         
-        // INVIO EMAIL
+        // SEND EMAIL
         try {
             await sendEmail(user.email, `Codice accesso ${user.gas_name}`, `Il tuo codice di accesso doliGAS è: ${code}`);
             console.log(`[AUTH] 📧 Email OTP inviata a utente #${user.id}`);
@@ -87,7 +107,7 @@ router.post('/login', async (req, res) => {
 
         const responseData = { success: true, message: 'Codice inviato.' };
         
-        // Istanza dimostrativa: il codice torna al frontend per la console di debug
+        // Demo instance: the code goes back to the frontend for the debug console
         if (showOtpInResponse) {
             responseData.debug_code = code;
         }
@@ -100,7 +120,7 @@ router.post('/login', async (req, res) => {
     }
 });
 
-// --- 2. VERIFICA (Multi-Profilo & Dual-Role) ---
+// --- 2. VERIFY (multi-profile & dual role) ---
 router.post('/verify', async (req, res) => {
     const { contact, token } = req.body;
     const pool = getDb();
@@ -112,7 +132,7 @@ router.post('/verify', async (req, res) => {
 
         const [links] = await pool.execute("SELECT * FROM magic_links WHERE user_id = ? AND token = ? AND expires_at > NOW()", [user.id, String(token || '')]);
         if (links.length === 0) {
-            // Dopo MAX_OTP_ATTEMPTS tentativi falliti il codice viene invalidato
+            // After MAX_OTP_ATTEMPTS failed attempts the code is invalidated
             const attempts = (otpAttempts.get(user.id) || 0) + 1;
             otpAttempts.set(user.id, attempts);
             if (attempts >= MAX_OTP_ATTEMPTS) {
@@ -186,7 +206,7 @@ router.post('/verify', async (req, res) => {
     }
 });
 
-// --- 3. REFRESH / ME (Recupero dati al reload) ---
+// --- 3. REFRESH / ME (reload data after a page refresh) ---
 router.get('/me', async (req, res) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];

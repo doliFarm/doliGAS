@@ -1,6 +1,25 @@
-/* src/components/ErrorBoundary.jsx - COMPONENTE DI SICUREZZA v1.0
-   STATUS: Integro, Completo, Robusto.
-   DESCRIZIONE: Intercetta errori fatali di React e fornisce una UI di ripristino.
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
+/* src/components/ErrorBoundary.jsx - SAFETY COMPONENT v1.0
+  DESCRIPTION: catches fatal React errors and shows a recovery UI.
 */
 import React from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
@@ -13,12 +32,12 @@ class ErrorBoundary extends React.Component {
   }
 
   static getDerivedStateFromError(error) {
-    // Aggiorna lo stato in modo che il prossimo render mostri l'UI di fallback.
+    // Update the state so the next render shows the fallback UI.
     return { hasError: true, error };
   }
 
   componentDidCatch(error, errorInfo) {
-    // Puoi inviare l'errore a un servizio di logging qui
+    // You can send the error to a logging service here
     console.error("UI CRITICAL ERROR:", error, errorInfo);
   }
 

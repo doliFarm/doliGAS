@@ -1,10 +1,30 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
  * @file frontend/src/views/producer/ProducerProductForm.jsx
  * @version v1.1.0
  * @author Luigi GRILLO @ doliFarm.com
- * @description Form di dettaglio prodotto per il produttore.
- * FIX: Ripristinato campo stato e impostato default "Attivo" per i nuovi inserimenti.
- * @status Integro, Completo, Robusto.
+ * @description Product detail form for the producer.
+ * FIX: restored the status field and set "Active" as default for new products.
+ * @status Stable
  * @date 2026-02-24
  */
 
@@ -19,7 +39,7 @@ import { Input, Select, Button } from '../../components/ui-kit';
 export const ProducerProductForm = ({ product, units, categories, onSave, onCancel, loading }) => {
   const { t } = useTranslation();
 
-  // --- INIZIALIZZAZIONE STATO ---
+  // --- STATE INITIALIZATION ---
   const [formData, setFormData] = useState({
     name: '',
     category_id: '',
@@ -27,10 +47,10 @@ export const ProducerProductForm = ({ product, units, categories, onSave, onCanc
     price: '',
     stock: '',
     min_order_qty: 1,
-    is_active: true // DEFAULT: Attivo per i nuovi prodotti
+    is_active: true // DEFAULT: active for new products
   });
 
-  // --- SYNC DATI (Edit Mode) ---
+  // --- DATA SYNC (edit mode) ---
   useEffect(() => {
     if (product) {
       setFormData({
@@ -53,7 +73,7 @@ export const ProducerProductForm = ({ product, units, categories, onSave, onCanc
   return (
     <form onSubmit={handleSubmit} className="space-y-6 font-sans">
       
-      {/* 1. ANAGRAFICA BASE */}
+      {/* 1. BASIC DATA */}
       <div className="space-y-4">
         <Input 
           label="Nome Prodotto" 
@@ -91,7 +111,7 @@ export const ProducerProductForm = ({ product, units, categories, onSave, onCanc
         </div>
       </div>
 
-      {/* 2. PREZZI E DISPONIBILITÀ */}
+      {/* 2. PRICES AND AVAILABILITY */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
         <Input 
           label="Prezzo (€)" 
@@ -118,7 +138,7 @@ export const ProducerProductForm = ({ product, units, categories, onSave, onCanc
         />
       </div>
 
-      {/* 3. STATO PRODOTTO (CHIRURGIA: RIPRISTINATO) */}
+      {/* 3. PRODUCT STATUS (restored) */}
       <div className="p-4 rounded-2xl border-2 border-indigo-50 bg-white">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -145,7 +165,7 @@ export const ProducerProductForm = ({ product, units, categories, onSave, onCanc
         </div>
       </div>
 
-      {/* 4. AZIONI FORM */}
+      {/* 4. FORM ACTIONS */}
       <div className="flex gap-3 pt-4 border-t border-slate-100">
         <Button 
           type="button" 

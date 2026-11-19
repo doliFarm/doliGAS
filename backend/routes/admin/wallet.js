@@ -1,33 +1,53 @@
+/*
+ * doliGAS - Solidarity purchasing group (GAS) management platform
+ * Copyright (C) 2026 Luigi Grillo (doliFarm)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 /**
- * doliGAS - Modulo Gestione Wallet (Admin)
+ * doliGAS - Wallet management module (Admin)
  * @file backend/routes/admin/wallet.js
  * @version v1.3.0
- * @status Integro, Completo, Robusto.
- * @description Gestione flussi finanziari basata su Schema v22.0.
- * FIX: Allineamento ENUM ('DEPOSIT' invece di 'RECHARGE') e rimozione tabelle fantasma.
+ * @status Stable
+ * @description Financial flows based on schema v22.0.
+ * FIX: aligned enums ('DEPOSIT' instead of 'RECHARGE') and removed phantom tables.
  */
 
 const express = require('express');
 const router = express.Router();
 
 /**
- * Helper per acquisire il pool di connessioni singleton.
+ * Helper returning the singleton connection pool.
  */
 const getDb = () => global.pool || require('../../config/db');
 
 /**
- * Helper interno per estrarre il gasId in modo robusto.
+ * Internal helper extracting the gasId from the request context.
  */
-// SICUREZZA: solo il gasId verificato dal middleware verifyGasMembership
+// SECURITY: only the gasId verified by the verifyGasMembership middleware
 const getGasId = (req) => req.user?.verifiedGasId;
 
 // =============================================================================
-// 1. LETTURA DATI E STATISTICHE
+// 1. READ DATA AND STATISTICS
 // =============================================================================
 
 /**
  * GET /api/admin/wallet/pending
- * Recupera le ricariche (DEPOSIT) in attesa di approvazione.
+ * Lists the top-ups (DEPOSIT) awaiting approval.
  */
 router.get('/pending', async (req, res) => {
     const pool = getDb();
@@ -53,7 +73,7 @@ router.get('/pending', async (req, res) => {
 
 /**
  * GET /api/admin/wallet/stats
- * Calcola il totale cassa, soci attivi e pendenze.
+ * Computes total cash, active members and pending items.
  */
 router.get('/stats', async (req, res) => {
     const pool = getDb();
@@ -77,12 +97,12 @@ router.get('/stats', async (req, res) => {
 });
 
 // =============================================================================
-// 2. OPERAZIONI DI MOVIMENTAZIONE (MANUAL ADD & APPROVE)
+// 2. MOVEMENTS (MANUAL ADD & APPROVE)
 // =============================================================================
 
 /**
  * POST /api/admin/wallet/manual-add
- * Ricarica immediata: aggiorna saldo e crea transazione 'completed'.
+ * Immediate top-up: updates the balance and creates a 'completed' transaction.
  */
 router.post('/manual-add', async (req, res) => {
     const pool = getDb();
@@ -100,7 +120,7 @@ router.post('/manual-add', async (req, res) => {
 
         await conn.beginTransaction();
 
-        // 1. Aggiornamento Saldo Reale (Tabella gas_memberships)
+        // 1. Update the actual balance (gas_memberships table)
         const [updateRes] = await conn.execute(
             "UPDATE gas_memberships SET balance = balance + ?, updated_at = NOW(), updated_by = ? WHERE user_id = ? AND gas_id = ?",
             [cleanAmount, adminId, userId, gasId]
@@ -108,8 +128,8 @@ router.post('/manual-add', async (req, res) => {
 
         if (updateRes.affectedRows === 0) throw new Error("Impossibile trovare il socio per questo GAS.");
 
-        // 2. Registrazione Movimento (Tabella wallet_transactions)
-        // NOTA: Usiamo 'DEPOSIT' come definito nell'ENUM dello schema v22.0
+        // 2. Record the movement (wallet_transactions table)
+        // NOTE: 'DEPOSIT' as defined in the schema v22.0 enum
         await conn.execute(`
             INSERT INTO wallet_transactions 
             (gas_id, user_id, amount, type, status, description, created_at, created_by)
@@ -130,7 +150,7 @@ router.post('/manual-add', async (req, res) => {
 
 /**
  * POST /api/admin/wallet/approve/:txId
- * Conferma una ricarica richiesta dal socio.
+ * Confirms a top-up requested by the member.
  */
 router.post('/approve/:txId', async (req, res) => {
     const pool = getDb();
@@ -142,7 +162,7 @@ router.post('/approve/:txId', async (req, res) => {
     try {
         await conn.beginTransaction();
 
-        // 1. Verifica e Lock della transazione
+        // 1. Check and lock the transaction
         const [tx] = await conn.execute(
             "SELECT * FROM wallet_transactions WHERE id = ? AND gas_id = ? AND status = 'pending' FOR UPDATE",
             [txId, gasId]
@@ -152,13 +172,13 @@ router.post('/approve/:txId', async (req, res) => {
 
         const { user_id, amount } = tx[0];
 
-        // 2. Aggiornamento saldo socio
+        // 2. Update the member balance
         await conn.execute(
             "UPDATE gas_memberships SET balance = balance + ?, updated_at = NOW(), updated_by = ? WHERE user_id = ? AND gas_id = ?",
             [amount, adminId, user_id, gasId]
         );
 
-        // 3. Chiusura transazione
+        // 3. Close the transaction
         await conn.execute(
             "UPDATE wallet_transactions SET status = 'completed', updated_at = NOW(), updated_by = ? WHERE id = ?",
             [adminId, txId]
@@ -177,12 +197,12 @@ router.post('/approve/:txId', async (req, res) => {
 });
 
 // =============================================================================
-// 3. STORICO E ESTRATTO CONTO
+// 3. HISTORY AND STATEMENT
 // =============================================================================
 
 /**
  * GET /api/admin/wallet/:userId/history
- * Recupera tutti i movimenti di un socio specifico.
+ * Lists all transactions of a given member.
  */
 router.get('/:userId/history', async (req, res) => {
     const pool = getDb();
