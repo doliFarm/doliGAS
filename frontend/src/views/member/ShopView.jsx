@@ -78,8 +78,9 @@ export const ShopView = () => {
     setCart(prev => {
       const current = prev[productId] || 0;
       const newVal = Math.max(0, current + delta);
-      if (maxStock !== null && newVal > maxStock) {
-          // Nota: qui potremmo aggiungere una chiave i18n per "Max stock raggiunto"
+      // Si blocca solo l'aumento oltre il disponibile: ridurre è sempre permesso
+      // (anche quando lo stock è stato abbassato dopo l'ordine)
+      if (delta > 0 && maxStock !== null && maxStock !== undefined && newVal > maxStock) {
           return prev;
       }
       const newCart = { ...prev };
@@ -162,6 +163,11 @@ export const ShopView = () => {
       const errorMsg = err.response?.data?.error;
       if (errorMsg === 'INSUFFICIENT_FUNDS') {
           setToast({ type: 'error', message: t('member_shop.error_insufficient_funds') });
+      } else if (errorMsg === 'STOCK_INSUFFICIENTE') {
+          // Qualcun altro ha ordinato nel frattempo: mostriamo cosa è ancora disponibile
+          const details = err.response?.data?.details || [];
+          const list = details.map(d => `${d.name}: ${d.available}`).join(', ');
+          setToast({ type: 'error', message: t('member_shop.error_stock', { items: list }) });
       } else {
           setToast({ type: 'error', message: t('common.error') });
       }
@@ -220,18 +226,23 @@ export const ShopView = () => {
                   <div className="text-right">
                     <span className="block font-black text-emerald-600 text-lg">{parseFloat(p.price).toFixed(2)}€</span>
                     <span className="text-[10px] text-slate-400 font-medium">/{p.unit}</span>
+                    {p.available !== null && p.available !== undefined && (
+                      <span className={`block text-[10px] font-bold ${p.available === 0 ? 'text-red-500' : 'text-slate-400'}`}>{t('member_shop.label_available', { count: p.available })}</span>
+                    )}
                   </div>
                 </div>
                 <div className="mt-auto pt-2 flex items-center justify-between border-t border-slate-50">
                    {shopData.isOpen ? (
                        qty > 0 ? (
                          <div className="flex items-center bg-emerald-50 rounded-xl p-1 gap-3 shadow-inner">
-                            <button onClick={() => updateQty(p.id, -1, p.stock)} className="w-8 h-8 flex items-center justify-center bg-white rounded-lg shadow text-emerald-700"><Minus size={16}/></button>
+                            <button onClick={() => updateQty(p.id, -1, p.available)} className="w-8 h-8 flex items-center justify-center bg-white rounded-lg shadow text-emerald-700"><Minus size={16}/></button>
                             <span className="font-black text-emerald-800 w-6 text-center">{qty}</span>
-                            <button onClick={() => updateQty(p.id, 1, p.stock)} className="w-8 h-8 flex items-center justify-center bg-emerald-600 rounded-lg shadow text-white"><Plus size={16}/></button>
+                            <button onClick={() => updateQty(p.id, 1, p.available)} className="w-8 h-8 flex items-center justify-center bg-emerald-600 rounded-lg shadow text-white"><Plus size={16}/></button>
                          </div>
+                       ) : p.available === 0 ? (
+                         <div className="w-full text-center text-xs text-red-500 font-bold py-2 bg-red-50 rounded-lg">{t('member_shop.label_sold_out')}</div>
                        ) : (
-                         <Button onClick={() => updateQty(p.id, 1, p.stock)} variant="outline" className="w-full border-slate-200 text-slate-600 hover:text-emerald-600 font-bold">{t('member_shop.btn_add')}</Button>
+                         <Button onClick={() => updateQty(p.id, 1, p.available)} variant="outline" className="w-full border-slate-200 text-slate-600 hover:text-emerald-600 font-bold">{t('member_shop.btn_add')}</Button>
                        )
                    ) : (
                        <div className="w-full text-center text-xs text-slate-400 italic py-2 bg-slate-50 rounded-lg">{t('member_shop.label_unavailable')}</div>
@@ -271,11 +282,11 @@ export const ShopView = () => {
                                         {shopData.isOpen ? (
                                             qty > 0 ? (
                                                 <div className="flex items-center justify-center gap-2">
-                                                    <button onClick={() => updateQty(p.id, -1, p.stock)} className="w-6 h-6 bg-slate-100 rounded text-slate-600"><Minus size={12}/></button>
+                                                    <button onClick={() => updateQty(p.id, -1, p.available)} className="w-6 h-6 bg-slate-100 rounded text-slate-600"><Minus size={12}/></button>
                                                     <span className="font-bold text-sm w-4">{qty}</span>
-                                                    <button onClick={() => updateQty(p.id, 1, p.stock)} className="w-6 h-6 bg-emerald-100 text-emerald-700 rounded"><Plus size={12}/></button>
+                                                    <button onClick={() => updateQty(p.id, 1, p.available)} className="w-6 h-6 bg-emerald-100 text-emerald-700 rounded"><Plus size={12}/></button>
                                                 </div>
-                                            ) : <button onClick={() => updateQty(p.id, 1, p.stock)} className="text-emerald-600 text-xs font-bold border border-emerald-200 px-2 py-1 rounded hover:bg-emerald-50">{t('member_shop.btn_add')}</button>
+                                            ) : p.available === 0 ? <span className="text-red-500 text-xs font-bold">{t('member_shop.label_sold_out')}</span> : <button onClick={() => updateQty(p.id, 1, p.available)} className="text-emerald-600 text-xs font-bold border border-emerald-200 px-2 py-1 rounded hover:bg-emerald-50">{t('member_shop.btn_add')}</button>
                                         ) : <span className="text-[10px] text-slate-300 italic">{t('member_shop.label_unavailable')}</span>}
                                     </td>
                                 </tr>

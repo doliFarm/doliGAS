@@ -311,6 +311,9 @@
     "label_unavailable": "Non disponible",
     "confirm_empty": "Vider le panier ?",
     "error_insufficient_funds": "Crédit insuffisant. Rechargez votre wallet ou contactez le coordinateur.",
+    "label_available": "Disponibles : {{count}}",
+    "label_sold_out": "Épuisé",
+    "error_stock": "Stock insuffisant : quelqu'un a commandé avant vous. Encore disponibles : {{items}}. Corrigez votre panier et réessayez.",
     "order_success": "Commande envoyée avec succès !"
   },
   "member_wallet": {

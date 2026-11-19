@@ -311,6 +311,9 @@
     "label_unavailable": "Unavailable",
     "confirm_empty": "Clear cart?",
     "error_insufficient_funds": "Insufficient credit. Please top up your wallet or contact the coordinator.",
+    "label_available": "Available: {{count}}",
+    "label_sold_out": "Sold out",
+    "error_stock": "Not enough stock: someone ordered before you. Still available: {{items}}. Please adjust your cart and try again.",
     "order_success": "Order sent successfully!"
   },
   "member_wallet": {

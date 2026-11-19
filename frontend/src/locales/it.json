@@ -342,6 +342,9 @@
     "label_unavailable": "Non acquistabile",
     "confirm_empty": "Svuotare il carrello?",
     "error_insufficient_funds": "Credito insufficiente. Ricarica il wallet o contatta il coordinatore.",
+    "label_available": "Disponibili: {{count}}",
+    "label_sold_out": "Esaurito",
+    "error_stock": "Disponibilità insufficiente, qualcuno ha ordinato prima di te. Ancora disponibili: {{items}}. Correggi il carrello e riprova.",
     "order_success": "Ordine inviato con successo!"
   },
   "member_wallet": {
