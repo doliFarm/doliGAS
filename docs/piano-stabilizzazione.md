@@ -5,17 +5,17 @@
 I numeri #n rimandano ai problemi elencati in `analisi-codice.md`.
 
 ## Decisioni prese
-- La copia locale coincide con il codice della demo (baseline `51c9794`).
+- La copia locale coincide con il codice della demo (baseline `d5fcaae`).
 - **Wallet:** l'importo ordinato si scala subito all'ordine; alla consegna si fa il conguaglio sul peso reale (SPESA se costa di più, REFUND se costa di meno).
 - Il repository git è su `main`, con un commit per argomento.
 
 ## Stato di avanzamento
 | Commit | Contenuto |
 |---|---|
-| `51c9794` | Baseline (stato della demo al 19/11) |
-| `d2431a6` | Fase 0: messa in sicurezza del backend |
-| `d3c18ec` | Schema reale del DB della demo → `db/schema_produzione_2026-11-19.sql` |
-| `07eb65b` | Consegna G7 con conguaglio, niente doppio addebito (#7, #8) |
+| `d5fcaae` | Baseline (stato della demo al 19/11) |
+| `2faa6dc` | Fase 0: messa in sicurezza del backend |
+| `8d6d93f` | Schema reale del DB della demo → `db/schema_produzione_2026-11-19.sql` |
+| `1c8b764` | Consegna G7 con conguaglio, niente doppio addebito (#7, #8) |
 
 Nessuna di queste modifiche è ancora in produzione sulla demo.
 

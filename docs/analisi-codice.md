@@ -1,6 +1,6 @@
 # doliGAS — Analisi del codice (18/11/2026)
 
-> **Stato al 19/11/2026:** i problemi #1–#8 e #14 sono risolti nel codice (commit `d2431a6` e `07eb65b`), ma non ancora in produzione. Il #10 è affrontato dalla Fase 1 (vedi `piano-stabilizzazione.md`).
+> **Stato al 19/11/2026:** i problemi #1–#8 e #14 sono risolti nel codice (commit `2faa6dc` e `1c8b764`), ma non ancora in produzione. Il #10 è affrontato dalla Fase 1 (vedi `piano-stabilizzazione.md`).
 
 Sorgente analizzato: 100 file, ~15k righe, senza repository git e senza test (al momento dell'analisi).
 

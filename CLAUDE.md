@@ -6,6 +6,7 @@ Questo file viene letto automaticamente da Claude Code (CLI) all'avvio. Tienilo 
 doliGAS è una web app multi-tenant per i Gruppi di Acquisto Solidale (GAS), con tre profili: **Coordinatore**, **Produttore** e **Socio**.
 - **Indirizzo strategico:** doliGAS è una **piattaforma indipendente**. L'integrazione con Dolibarr/doliFarm (il modulo PHP in `../dolifarm`) è **opzionale**: si attiva solo per i GAS più complessi o per i produttori che la chiedono. Il nucleo non deve mai dipendere da Dolibarr.
 - **Installazione attiva:** https://demo.dolifarm365.com. Il codice in questa cartella coincide con quello della demo (baseline al 19/11/2026).
+- **Repository:** https://github.com/doliFarm/doliGAS (branch `main`). `origin/main` (commit `d5fcaae`, aprile 2026) coincide con il codice della demo.
 - **Autore e maintainer:** Luigi Grillo (doliFarm). Lingua di lavoro: italiano.
 
 ## Stack
@@ -24,12 +25,12 @@ doliGAS è una web app multi-tenant per i Gruppi di Acquisto Solidale (GAS), con
 
 ## Stato (19/11/2026)
 Commit su `main`:
-1. `51c9794` Baseline (uguale alla demo)
-2. `d2431a6` Fase 0: sicurezza (debug API, OTP fuori dai log, limite tentativi, JWT_SECRET obbligatorio, gasId unico, mercato aperto, lock del listino dopo G2, HTML neutralizzato nelle email)
-3. `d3c18ec` Schema reale della demo in `db/`
-4. `07eb65b` Consegna G7 con conguaglio (prima falliva sempre su `wallet_history`, una tabella inesistente)
+1. `d5fcaae` Ultimo commit su `origin/main`, uguale alla demo
+2. `2faa6dc` Fase 0: sicurezza (debug API, OTP fuori dai log, limite tentativi, JWT_SECRET obbligatorio, gasId unico, mercato aperto, lock del listino dopo G2, HTML neutralizzato nelle email)
+3. `8d6d93f` Schema reale della demo in `db/`
+4. `1c8b764` Consegna G7 con conguaglio (prima falliva sempre su `wallet_history`, una tabella inesistente)
 
-**Nessuna di queste modifiche è ancora in produzione.** Prima di distribuirle sulla demo:
+I commit 2–4 e quello di questo file sono **solo locali, non ancora inviati con push** su GitHub. **Nessuna di queste modifiche è ancora in produzione.** Prima di distribuirle sulla demo:
 - `JWT_SECRET` nuovo, di almeno 32 caratteri (`openssl rand -hex 32`); altrimenti il server non parte.
 - Non impostare `ENABLE_DEBUG_API` sulla demo.
 
@@ -45,7 +46,7 @@ Il piano completo è in `docs/piano-stabilizzazione.md`; l'analisi dei problemi 
 4. **Fase 4, connettore Dolibarr opzionale:** campi `external_ref` e `external_source`; configurazione per produttore (il suo Dolibarr: listino in entrata, ordini G5 come ordini cliente) e per GAS (il Dolibarr del GAS: fornitori, ordini fornitore, fatture ai soci); sincronizzazione asincrona tramite una tabella outbox.
 
 ## Insidie note
-- I file sorgente hanno **fine riga CRLF**: preservale quando modifichi.
+- **Fine riga:** nel repository i file sono salvati con LF, nella cartella di lavoro su Windows con CRLF (`core.autocrlf=true` in questo repo). Non convertire i file a mano.
 - In compose `NODE_ENV` prende il valore di `APP_ENV` (`dev`/`prod`), quindi `NODE_ENV === 'development'` non è mai vero nei container.
 - `global.pool` viene usato ovunque tramite `getDb()`. Per le query usa `pool.execute` con parametri `?`, mai concatenazione.
 - Le date del DB sono stringhe (`dateStrings: true`); i confronti temporali vanno fatti preferibilmente in SQL con `NOW()`.
