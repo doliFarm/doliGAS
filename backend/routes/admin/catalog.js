@@ -21,6 +21,11 @@ const getDb = () => global.pool || require('../../config/db');
 // SICUREZZA: solo il gasId verificato dal middleware verifyGasMembership
 const getGasId = (req) => req.user?.verifiedGasId;
 
+const { parseCsv, parseNumber, parseBool } = require('../../utils/csv');
+
+// Limite di righe per un import, per non bloccare il server con un file enorme
+const MAX_IMPORT_ROWS = 2000;
+
 // =============================================================================
 // SEZIONE PRODOTTI (CATALOGO)
 // =============================================================================
@@ -266,6 +271,308 @@ router.get('/units', async (req, res) => {
         res.json(rows);
     } catch (e) {
         res.status(500).json({ error: "Errore caricamento unità" });
+    }
+});
+
+
+// =============================================================================
+// SEZIONE IMPORT DA CSV
+// =============================================================================
+
+/**
+ * Colonne accettate nel CSV. La prima è il nome canonico, le altre sono alias
+ * (anche in inglese) riconosciuti nell'intestazione.
+ */
+const CSV_COLUMNS = {
+    nome: ['nome', 'prodotto', 'name', 'product'],
+    produttore: ['produttore', 'fornitore', 'producer', 'supplier'],
+    categoria: ['categoria', 'category'],
+    unita: ['unita', 'unitadimisura', 'um', 'unit'],
+    prezzo: ['prezzo', 'price'],
+    stock: ['stock', 'disponibilita', 'quantita'],
+    minordine: ['minordine', 'minimoordine', 'minorderqty', 'moq'],
+    attivo: ['attivo', 'active', 'isactive']
+};
+
+/** Trova il valore di una colonna logica in una riga, provando tutti gli alias. */
+const pick = (row, key) => {
+    for (const alias of CSV_COLUMNS[key]) {
+        if (row[alias] !== undefined && String(row[alias]).trim() !== '') return String(row[alias]).trim();
+    }
+    return '';
+};
+
+/** Carica le anagrafiche del GAS necessarie a risolvere i nomi del CSV in identificativi. */
+const loadLookups = async (pool, gasId) => {
+    const [producers] = await pool.execute(
+        "SELECT id, business_name FROM producers WHERE gas_id = ? AND is_active = 1", [gasId]);
+    const [categories] = await pool.execute(
+        "SELECT id, name FROM product_categories WHERE gas_id = ?", [gasId]);
+    const [units] = await pool.execute("SELECT id, name, symbol FROM product_units");
+
+    const key = (s) => String(s).trim().toLowerCase();
+    return {
+        producers: new Map(producers.map(p => [key(p.business_name), p.id])),
+        categories: new Map(categories.map(c => [key(c.name), c.id])),
+        units: new Map([
+            ...units.map(u => [key(u.symbol), u.id]),
+            ...units.map(u => [key(u.name), u.id])
+        ]),
+        names: {
+            producers: producers.map(p => p.business_name),
+            categories: categories.map(c => c.name),
+            units: units.map(u => u.symbol)
+        }
+    };
+};
+
+/**
+ * Controlla una riga e restituisce { row, errors }.
+ * row contiene già gli identificativi risolti, pronti per l'inserimento.
+ */
+const validateRow = (raw, lookups) => {
+    const errors = [];
+    const key = (s) => String(s).trim().toLowerCase();
+
+    const nome = pick(raw, 'nome');
+    if (!nome) errors.push('nome del prodotto mancante');
+    if (nome.length > 255) errors.push('nome troppo lungo (massimo 255 caratteri)');
+
+    const produttore = pick(raw, 'produttore');
+    const producerId = lookups.producers.get(key(produttore));
+    if (!produttore) errors.push('produttore mancante');
+    else if (!producerId) errors.push(`produttore "${produttore}" non presente fra quelli attivi del GAS`);
+
+    const unita = pick(raw, 'unita');
+    const unitId = lookups.units.get(key(unita));
+    if (!unita) errors.push('unità di misura mancante');
+    else if (!unitId) errors.push(`unità "${unita}" non riconosciuta (ammesse: ${lookups.names.units.join(', ')})`);
+
+    const categoria = pick(raw, 'categoria');
+    let categoryId = null;
+    if (categoria) {
+        categoryId = lookups.categories.get(key(categoria));
+        if (!categoryId) errors.push(`categoria "${categoria}" non presente nel GAS`);
+    }
+
+    const prezzo = parseNumber(pick(raw, 'prezzo'));
+    if (prezzo === null) errors.push('prezzo mancante');
+    else if (Number.isNaN(prezzo) || prezzo < 0) errors.push('prezzo non valido');
+
+    const stock = parseNumber(pick(raw, 'stock'));
+    if (Number.isNaN(stock)) errors.push('stock non valido');
+
+    const minOrdine = parseNumber(pick(raw, 'minordine'));
+    if (Number.isNaN(minOrdine) || (minOrdine !== null && minOrdine <= 0)) errors.push('minimo d\'ordine non valido');
+
+    return {
+        row: {
+            line: raw._line,
+            name: nome,
+            producer_id: producerId || null,
+            producer_name: produttore,
+            category_id: categoryId,
+            unit_id: unitId || null,
+            price: prezzo,
+            stock: stock,
+            min_order_qty: minOrdine === null ? 1 : minOrdine,
+            is_active: parseBool(pick(raw, 'attivo'), true) ? 1 : 0
+        },
+        errors
+    };
+};
+
+/**
+ * Rivalidazione delle righe che il client rimanda indietro per l'import.
+ * I dati arrivano già risolti in identificativi, ma non sono attendibili:
+ * qui si verifica che ogni identificativo appartenga davvero a questo GAS.
+ */
+const validatePayloadRow = (p, lookups) => {
+    const errors = [];
+    const producerIds = new Set(lookups.producers.values());
+    const categoryIds = new Set(lookups.categories.values());
+    const unitIds = new Set(lookups.units.values());
+
+    const name = String(p.name ?? '').trim();
+    if (!name) errors.push('nome del prodotto mancante');
+    if (name.length > 255) errors.push('nome troppo lungo (massimo 255 caratteri)');
+
+    const producerId = Number(p.producer_id);
+    if (!producerIds.has(producerId)) errors.push('produttore non valido per questo GAS');
+
+    const unitId = Number(p.unit_id);
+    if (!unitIds.has(unitId)) errors.push('unità di misura non valida');
+
+    let categoryId = null;
+    if (p.category_id !== null && p.category_id !== undefined && p.category_id !== '') {
+        categoryId = Number(p.category_id);
+        if (!categoryIds.has(categoryId)) errors.push('categoria non valida per questo GAS');
+    }
+
+    const price = Number(p.price);
+    if (!Number.isFinite(price) || price < 0) errors.push('prezzo non valido');
+
+    let stock = null;
+    if (p.stock !== null && p.stock !== undefined && p.stock !== '') {
+        stock = Number(p.stock);
+        if (!Number.isFinite(stock) || stock < 0) errors.push('stock non valido');
+    }
+
+    const minOrderQty = Number(p.min_order_qty ?? 1);
+    if (!Number.isFinite(minOrderQty) || minOrderQty <= 0) errors.push('minimo d\'ordine non valido');
+
+    return {
+        row: {
+            name, producer_id: producerId, category_id: categoryId, unit_id: unitId,
+            price, stock, min_order_qty: minOrderQty, is_active: p.is_active ? 1 : 0
+        },
+        errors
+    };
+};
+
+/**
+ * POST /api/admin/catalog/validate
+ * Controlla il CSV senza scrivere niente e restituisce il riepilogo che il
+ * frontend mostra prima di confermare l'import.
+ */
+router.post('/validate', async (req, res) => {
+    const pool = getDb();
+    const gasId = getGasId(req);
+    const { csvData } = req.body;
+
+    if (!gasId) return res.status(400).json({ error: "Contesto GAS mancante." });
+    if (!csvData || typeof csvData !== 'string') return res.status(400).json({ error: "Nessun contenuto CSV ricevuto." });
+
+    try {
+        const { rows, headers, separator } = parseCsv(csvData);
+        if (rows.length === 0) {
+            return res.status(400).json({ error: "Il file non contiene righe oltre all'intestazione." });
+        }
+        if (rows.length > MAX_IMPORT_ROWS) {
+            return res.status(400).json({ error: `Il file contiene ${rows.length} righe: il massimo è ${MAX_IMPORT_ROWS}.` });
+        }
+
+        const lookups = await loadLookups(pool, gasId);
+        const validRows = [];
+        const errors = [];
+
+        rows.forEach(raw => {
+            const { row, errors: rowErrors } = validateRow(raw, lookups);
+            if (rowErrors.length === 0) validRows.push(row);
+            else errors.push({ line: raw._line, name: row.name, errors: rowErrors });
+        });
+
+        res.json({
+            summary: { total: rows.length, valid: validRows.length, invalid: errors.length },
+            validRows,
+            errors,
+            detected: { separator, headers },
+            available: lookups.names
+        });
+    } catch (e) {
+        console.error("[CATALOG IMPORT] Validate error:", e.message);
+        res.status(500).json({ error: "Errore nella lettura del file CSV." });
+    }
+});
+
+/**
+ * POST /api/admin/catalog/bulk-import
+ * Scrive le righe valide. Un prodotto con lo stesso nome dello stesso produttore
+ * viene aggiornato invece di essere duplicato, così reimportare un listino
+ * aggiornato funziona.
+ *
+ * I dati del client non sono considerati attendibili: ogni riga viene validata
+ * di nuovo qui contro le anagrafiche del GAS.
+ *
+ * Il prezzo di un prodotto con ordini in corso NON viene toccato, come nella
+ * modifica manuale: cambierebbe il totale di ordini già fatti.
+ */
+router.post('/bulk-import', async (req, res) => {
+    const pool = getDb();
+    const gasId = getGasId(req);
+    const adminId = req.user.id;
+    const { products } = req.body;
+
+    if (!gasId) return res.status(400).json({ error: "Contesto GAS mancante." });
+    if (!Array.isArray(products) || products.length === 0) {
+        return res.status(400).json({ error: "Nessun prodotto da importare." });
+    }
+    if (products.length > MAX_IMPORT_ROWS) {
+        return res.status(400).json({ error: `Troppe righe: il massimo è ${MAX_IMPORT_ROWS}.` });
+    }
+
+    const conn = await pool.getConnection();
+    try {
+        const lookups = await loadLookups(pool, gasId);
+        let created = 0, updated = 0, priceKept = 0;
+        const rejected = [];
+
+        await conn.beginTransaction();
+
+        for (const p of products) {
+            const { row, errors } = validatePayloadRow(p, lookups);
+            if (errors.length > 0) {
+                rejected.push({ line: p.line, name: p.name, errors });
+                continue;
+            }
+            const categoryId = row.category_id;
+
+            const [existing] = await conn.execute(
+                "SELECT id FROM products WHERE producer_id = ? AND name = ? LIMIT 1",
+                [row.producer_id, row.name]
+            );
+
+            if (existing.length > 0) {
+                const productId = existing[0].id;
+                const [active] = await conn.execute(`
+                    SELECT COUNT(*) AS count FROM order_items oi
+                    JOIN orders o ON oi.order_id = o.id
+                    WHERE oi.product_id = ? AND o.status IN ('draft', 'confirmed')`, [productId]);
+
+                if (active[0].count > 0) {
+                    // Ordini in corso: si aggiorna tutto tranne il prezzo
+                    await conn.execute(`
+                        UPDATE products SET category_id = ?, unit_id = ?, stock = ?,
+                            min_order_qty = ?, is_active = ?, updated_at = NOW(), updated_by = ?
+                        WHERE id = ?`,
+                        [categoryId, row.unit_id, row.stock, row.min_order_qty, row.is_active, adminId, productId]);
+                    priceKept += 1;
+                } else {
+                    await conn.execute(`
+                        UPDATE products SET category_id = ?, unit_id = ?, price = ?, stock = ?,
+                            min_order_qty = ?, is_active = ?, updated_at = NOW(), updated_by = ?
+                        WHERE id = ?`,
+                        [categoryId, row.unit_id, row.price, row.stock, row.min_order_qty, row.is_active, adminId, productId]);
+                }
+                updated += 1;
+            } else {
+                await conn.execute(`
+                    INSERT INTO products (producer_id, category_id, unit_id, name, price, stock,
+                        min_order_qty, is_active, created_by, updated_by)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [row.producer_id, categoryId, row.unit_id, row.name, row.price, row.stock,
+                     row.min_order_qty, row.is_active, adminId, adminId]);
+                created += 1;
+            }
+        }
+
+        /**
+         * Il listino è cambiato: le validazioni dei produttori interessati decadono,
+         * come avviene quando modificano i prodotti da soli.
+         */
+        await conn.execute(`
+            DELETE v FROM producer_cycle_validations v
+            JOIN cycles c ON c.id = v.cycle_id
+            WHERE c.gas_id = ? AND c.is_active = 1 AND c.producers_deadline > NOW()`, [gasId]);
+
+        await conn.commit();
+        res.json({ success: true, created, updated, priceKept, rejected });
+    } catch (e) {
+        await conn.rollback();
+        console.error("[CATALOG IMPORT] Bulk import error:", e.message);
+        res.status(500).json({ error: "Errore durante l'importazione: nessuna riga è stata salvata." });
+    } finally {
+        conn.release();
     }
 });
 

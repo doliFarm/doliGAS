@@ -10,6 +10,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middlewares/auth');
+const { notifyCoordinatorRaw } = require('../utils/notifications');
 
 /**
  * Helper per acquisire il pool di connessioni singleton.
@@ -395,9 +396,94 @@ router.get('/orders/:id', ensureMembership, async (req, res) => {
     } catch (err) { res.status(500).json({ error: "Errore dettaglio ordine" }); }
 });
 
+
 // =============================================================================
-// 5. PROFILO UTENTE
+// 5. RICHIESTA DI RICARICA DEL WALLET
 // =============================================================================
+
+/**
+ * POST /api/members/wallet/topup-request
+ * Il socio dichiara di aver versato una somma (bonifico o contanti): viene creata
+ * una transazione in attesa, che il coordinatore approva dalla sua area.
+ * Il saldo NON cambia qui: cambia solo con l'approvazione.
+ */
+router.post('/wallet/topup-request', ensureMembership, async (req, res) => {
+    const pool = getDb();
+    const { amount, description } = req.body;
+    const userId = req.user.id;
+    const gasId = req.gasId;
+
+    const value = Number(amount);
+    if (!Number.isFinite(value) || value <= 0) {
+        return res.status(400).json({ error: "IMPORTO_NON_VALIDO: indica una cifra maggiore di zero." });
+    }
+    if (value > 10000) {
+        return res.status(400).json({ error: "IMPORTO_NON_VALIDO: cifra troppo alta, contatta il coordinatore." });
+    }
+
+    try {
+        // Una richiesta in attesa alla volta, per non riempire la coda del coordinatore
+        const [pending] = await pool.execute(
+            "SELECT id FROM wallet_transactions WHERE user_id = ? AND gas_id = ? AND status = 'pending' AND type = 'DEPOSIT'",
+            [userId, gasId]
+        );
+        if (pending.length > 0) {
+            return res.status(409).json({ error: "RICHIESTA_GIA_PRESENTE: hai già una ricarica in attesa di approvazione." });
+        }
+
+        const note = String(description || '').trim().substring(0, 500) || 'Ricarica dichiarata dal socio';
+        const [result] = await pool.execute(`
+            INSERT INTO wallet_transactions
+                (gas_id, user_id, amount, type, status, description, created_at, created_by)
+            VALUES (?, ?, ?, 'DEPOSIT', 'pending', ?, NOW(), ?)`,
+            [gasId, userId, value, note, userId]
+        );
+
+        // Avviso al coordinatore, così non deve controllare la pagina a mano
+        try {
+            const [user] = await pool.execute("SELECT first_name, last_name FROM users WHERE id = ?", [userId]);
+            const who = user.length ? `${user[0].first_name} ${user[0].last_name}` : `utente #${userId}`;
+            await notifyCoordinatorRaw(
+                gasId,
+                'Nuova ricarica da approvare',
+                `${who} ha dichiarato una ricarica di ${value.toFixed(2)} €. Verifica l'accredito e approvala dall'area soci.`,
+                'info'
+            );
+        } catch (e) {
+            console.error("[MEMBER_TOPUP] Notifica al coordinatore non inviata:", e.message);
+        }
+
+        res.json({ success: true, transactionId: result.insertId, status: 'pending' });
+    } catch (err) {
+        console.error("[MEMBER_TOPUP] Error:", err.message);
+        res.status(500).json({ error: "Errore nella registrazione della richiesta." });
+    }
+});
+
+/**
+ * DELETE /api/members/wallet/topup-request/:id
+ * Il socio annulla la propria richiesta, finché è ancora in attesa.
+ */
+router.delete('/wallet/topup-request/:id', ensureMembership, async (req, res) => {
+    const pool = getDb();
+    try {
+        const [result] = await pool.execute(
+            "DELETE FROM wallet_transactions WHERE id = ? AND user_id = ? AND gas_id = ? AND status = 'pending'",
+            [req.params.id, req.user.id, req.gasId]
+        );
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: "Richiesta non trovata o già processata." });
+        }
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: "Errore nell'annullamento della richiesta." });
+    }
+});
+
+// =============================================================================
+// 6. PROFILO UTENTE
+// =============================================================================
+
 
 router.get('/profile', ensureMembership, async (req, res) => {
     try {

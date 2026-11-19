@@ -22,8 +22,15 @@ export const WalletView = () => {
   const [loading, setLoading] = useState(true);
   const [balance, setBalance] = useState(0);
   const [transactions, setTransactions] = useState([]);
+  const pendingTopUp = transactions.find(tx => tx.status === 'pending' && parseFloat(tx.amount) > 0);
   const [gasInfo, setGasInfo] = useState(null); // Stato per info GAS (IBAN)
   const [showTopUpInfo, setShowTopUpInfo] = useState(false);
+  // Dichiarazione di una ricarica: il coordinatore la deve approvare
+  const [topUpAmount, setTopUpAmount] = useState('');
+  const [topUpNote, setTopUpNote] = useState('');
+  const [sendingRequest, setSendingRequest] = useState(false);
+  const [requestMessage, setRequestMessage] = useState(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -55,7 +62,7 @@ export const WalletView = () => {
       }
     };
     fetchData();
-  }, [activeProfile]);
+  }, [activeProfile, reloadKey]); // reloadKey: ricarica lo storico dopo una richiesta
 
   if (loading) return <div className="p-20 flex justify-center"><Loader2 className="animate-spin text-indigo-500" size={40}/></div>;
 
@@ -126,7 +133,7 @@ export const WalletView = () => {
         </Card>
       </div>
 
-      {/* 3. MODALE INFO RICARICA */}
+      {/* 3. MODALE RICARICA: dati per il versamento e dichiarazione al coordinatore */}
       <Modal isOpen={showTopUpInfo} onClose={() => setShowTopUpInfo(false)} title={t('member_wallet.topup_info_title')}>
         <div className="p-4 space-y-6">
           <div className="flex items-start gap-4">
@@ -150,7 +157,70 @@ export const WalletView = () => {
             <p className="text-xs text-slate-500 mt-2 italic">{t('member_wallet.iban_note')}</p>
           </div>
 
-          <Button onClick={() => setShowTopUpInfo(false)} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl">
+          {/* Dichiarazione della ricarica: crea una richiesta in attesa di approvazione */}
+          {pendingTopUp ? (
+            <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl text-sm text-amber-800">
+              {t('member_wallet.topup_pending', 'Hai già una ricarica in attesa di approvazione:')}{' '}
+              <strong>{parseFloat(pendingTopUp.amount).toFixed(2)} €</strong>
+            </div>
+          ) : (
+            <div className="border-t border-slate-200 pt-5 space-y-3">
+              <p className="text-xs font-bold text-slate-400 uppercase">
+                {t('member_wallet.topup_declare_title', 'Hai già versato?')}
+              </p>
+              <p className="text-sm text-slate-600">
+                {t('member_wallet.topup_declare_desc', 'Comunica l\'importo al coordinatore: il saldo si aggiorna quando lui conferma di averlo ricevuto.')}
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="number" min="0.01" step="0.01" inputMode="decimal"
+                  value={topUpAmount}
+                  onChange={(e) => setTopUpAmount(e.target.value)}
+                  placeholder="0,00"
+                  className="flex-1 border border-slate-200 rounded-xl px-4 py-3 font-mono font-bold text-slate-800 focus:outline-none focus:border-indigo-400"
+                />
+                <input
+                  type="text"
+                  value={topUpNote}
+                  onChange={(e) => setTopUpNote(e.target.value)}
+                  placeholder={t('member_wallet.topup_note_placeholder', 'Nota (es. bonifico del 12/03)')}
+                  className="flex-[2] border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-400"
+                />
+              </div>
+              {requestMessage && (
+                <p className={`text-sm font-bold ${requestMessage.type === 'error' ? 'text-red-600' : 'text-emerald-600'}`}>
+                  {requestMessage.text}
+                </p>
+              )}
+              <Button
+                disabled={sendingRequest || !(parseFloat(String(topUpAmount).replace(',', '.')) > 0)}
+                onClick={async () => {
+                  setSendingRequest(true);
+                  setRequestMessage(null);
+                  try {
+                    await axios.post(`${API_URL}/api/members/wallet/topup-request`, {
+                      gasId: activeProfile.context_id,
+                      amount: parseFloat(String(topUpAmount).replace(',', '.')),
+                      description: topUpNote
+                    });
+                    setRequestMessage({ type: 'success', text: t('member_wallet.topup_sent', 'Richiesta inviata al coordinatore.') });
+                    setTopUpAmount('');
+                    setTopUpNote('');
+                    setReloadKey(k => k + 1);
+                  } catch (err) {
+                    setRequestMessage({ type: 'error', text: err.response?.data?.error || t('common.error') });
+                  } finally {
+                    setSendingRequest(false);
+                  }
+                }}
+                className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl"
+              >
+                {sendingRequest ? <Loader2 className="animate-spin mx-auto" size={18} /> : t('member_wallet.topup_declare_btn', 'Comunica la ricarica')}
+              </Button>
+            </div>
+          )}
+
+          <Button onClick={() => setShowTopUpInfo(false)} variant="outline" className="w-full font-bold py-3 rounded-xl">
             {t('common.close') || 'Ho capito'}
           </Button>
         </div>

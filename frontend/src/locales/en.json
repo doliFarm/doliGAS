@@ -325,7 +325,13 @@
     "how_to_topup": "How to top up your account?",
     "topup_desc": "Make a bank transfer to the group account or give cash to the coordinator. The top-up will be credited manually after verification.",
     "iban_label": "Bank Details (Example)",
-    "iban_note": "Include your Full Name in the payment reason."
+    "iban_note": "Include your Full Name in the payment reason.",
+    "topup_declare_title": "Already paid?",
+    "topup_declare_desc": "Tell the coordinator the amount: your balance is updated once they confirm they received it.",
+    "topup_declare_btn": "Report the payment",
+    "topup_note_placeholder": "Note (e.g. transfer of 12/03)",
+    "topup_sent": "Request sent to the coordinator.",
+    "topup_pending": "You already have a top-up awaiting approval:"
   },
   "producer_dash": {
     "status_LIST_OPEN": "Catalogue Open",

@@ -325,7 +325,13 @@
     "how_to_topup": "Comment recharger mon compte ?",
     "topup_desc": "Effectuez un virement sur le compte du GAS ou remettez des espèces au coordinateur. La recharge sera créditée manuellement après vérification.",
     "iban_label": "Coordonnées Bancaires (Exemple)",
-    "iban_note": "Indiquez votre Prénom et Nom dans le motif."
+    "iban_note": "Indiquez votre Prénom et Nom dans le motif.",
+    "topup_declare_title": "Déjà versé ?",
+    "topup_declare_desc": "Indiquez le montant au coordinateur : votre solde est mis à jour dès qu'il confirme l'avoir reçu.",
+    "topup_declare_btn": "Signaler le versement",
+    "topup_note_placeholder": "Note (ex. virement du 12/03)",
+    "topup_sent": "Demande envoyée au coordinateur.",
+    "topup_pending": "Vous avez déjà une recharge en attente d'approbation :"
   },
   "producer_dash": {
     "status_LIST_OPEN": "Catalogue Ouvert",
