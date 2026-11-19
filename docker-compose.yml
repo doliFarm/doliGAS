@@ -33,7 +33,9 @@ services:
           memory: 256M
     healthcheck:
       # FIX ROBUSTEZZA: Usiamo mysqladmin ma con un timeout più lungo per lo swap
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD}"]
+      # $$ sfugge all'interpolazione di compose: la password è letta DENTRO il container,
+      # così non compare in chiaro nell'output di docker inspect
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$${MYSQL_ROOT_PASSWORD}"]
       interval: 40s
       timeout: 20s
       retries: 5
@@ -90,6 +92,10 @@ services:
     build:
       context: ./frontend
       target: ${APP_ENV}
+      args:
+        VITE_API_URL: ${VITE_API_URL}
+        VITE_APP_ENV: ${APP_ENV}
+        VITE_DEMO_MODE: ${VITE_DEMO_MODE:-false}
     container_name: gashub-frontend
     restart: unless-stopped
     expose:
@@ -99,6 +105,8 @@ services:
     environment:
       - VITE_API_URL=${VITE_API_URL}
       - VITE_APP_ENV=${APP_ENV}
+      # Usato dal target dev (server Vite); nel target prod vale il build arg qui sopra
+      - VITE_DEMO_MODE=${VITE_DEMO_MODE:-false}
     depends_on:
       - gashub-api
     volumes:

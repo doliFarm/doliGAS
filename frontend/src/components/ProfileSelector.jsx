@@ -11,6 +11,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
+import { APP_CONFIG } from '../config';
 import { Card, Badge, Modal, Button } from './ui-kit';
 import { ShieldCheck, ShoppingCart, Tractor, LogOut, Info } from 'lucide-react';
 
@@ -22,17 +23,23 @@ export const ProfileSelector = () => {
   const [isDemoModalOpen, setIsDemoModalOpen] = useState(false);
 
   useEffect(() => {
-    // Verifica in sessionStorage se l'utente ha già visto l'avviso in questa sessione
-    const hasSeenDemoNotice = sessionStorage.getItem('doliGAS_demo_notice_seen');
-    if (!hasSeenDemoNotice) {
-      setIsDemoModalOpen(true);
+    // L'avviso riguarda SOLO l'istanza dimostrativa: su un'installazione reale di un GAS
+    // non deve comparire. Si attiva con VITE_DEMO_MODE=true nel .env.
+    if (!APP_CONFIG.DEMO_MODE) return;
+    // sessionStorage: mostrato una volta per sessione del browser
+    try {
+      if (!sessionStorage.getItem('doliGAS_demo_notice_seen')) setIsDemoModalOpen(true);
+    } catch (e) {
+      setIsDemoModalOpen(true); // sessionStorage non disponibile: mostra comunque l'avviso
     }
   }, []);
 
   const handleCloseModal = () => {
     setIsDemoModalOpen(false);
     // Memorizza lo stato per non riproporlo fino alla chiusura della sessione del browser
-    sessionStorage.setItem('doliGAS_demo_notice_seen', 'true');
+    try {
+      sessionStorage.setItem('doliGAS_demo_notice_seen', 'true');
+    } catch (e) { /* ignorato: l'avviso ricomparirà al prossimo accesso */ }
   };
 
   return (

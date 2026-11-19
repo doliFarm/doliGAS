@@ -7,6 +7,8 @@ export const APP_CONFIG = {
   // In sviluppo locale senza Docker, si potrebbe voler puntare a localhost:3000
   API_URL: import.meta.env.VITE_API_URL || '',
   APP_ENV: import.meta.env.VITE_APP_ENV || 'prod',
+  // Avviso "questa è una demo" all'ingresso: solo sull'istanza dimostrativa
+  DEMO_MODE: import.meta.env.VITE_DEMO_MODE === 'true',
   // Rotte di default per ruolo
   DEFAULT_ROUTES: {
     admin: '/admin',
