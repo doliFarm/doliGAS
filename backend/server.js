@@ -1,11 +1,8 @@
 /**
  * @file backend/server.js
- * @description Application Entry Point - Versione Consolidata v1.1
- * STATUS: Production Ready
+ * @description Avvio del backend doliGAS: attende il database, applica le migrazioni,
+ * avvia lo scheduler e apre la porta. L'applicazione Express è in app.js.
  */
-const express = require('express');
-const cors = require('cors');
-const morgan = require('morgan');
 require('dotenv').config();
 
 // SICUREZZA: senza un JWT_SECRET robusto il server non deve partire
@@ -14,7 +11,7 @@ if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
     process.exit(1);
 }
 
-// 1. Inizializzazione Log Buffer (In-Memory per Debug Console)
+// 1. Log in memoria per la console di debug (ultimi 100 messaggi)
 global.logBuffer = [];
 const MAX_LOGS = 100;
 const originalLog = console.log;
@@ -29,82 +26,24 @@ const addToBuffer = (type, args) => {
 console.log = (...args) => { addToBuffer('INFO', args); originalLog.apply(console, args); };
 console.error = (...args) => { addToBuffer('ERROR', args); originalError.apply(console, args); };
 
-// 2. Importazione Risorse e Rotte
-const pool = require('./config/db');
-global.pool = pool;
-
-const authRoutes = require('./routes/auth');
-const productRoutes = require('./routes/products');
-const memberRoutes = require('./routes/members');
-const adminRoutes = require('./routes/admin/index'); 
-const debugRoutes = require('./routes/debug');
-const publicRoutes = require('./routes/public');
-
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-// 3. Configurazione CORS Robusta
-// Risolve l'errore: "blocked by CORS policy"
-const allowedOrigins = [
-    'https://doligas.com',
-    'https://www.doligas.com',
-    'https://doligas.it',
-    'https://www.doligas.it',
-    'http://localhost:5173',
-    'https://demo.dolifarm365.com'
-];
-
-app.use(cors({
-    origin: function (origin, callback) {
-        if (!origin) return callback(null, true);
-        if (allowedOrigins.indexOf(origin) === -1) {
-            return callback(new Error('CORS Policy: Origin not allowed'), false);
-        }
-        return callback(null, true);
-    },
-    credentials: true
-}));
-
 // Avviso ripetuto all'avvio: espone i codici di accesso, va usato solo sulle demo
 if (process.env.DEMO_SHOW_OTP === 'true') {
     console.warn('[SECURITY] ⚠️ DEMO_SHOW_OTP attivo: il codice di accesso viene restituito');
     console.warn('[SECURITY] ⚠️ nella risposta di login. Solo per istanze dimostrative con dati finti.');
 }
 
-app.use(express.json({ limit: '10mb' }));
-app.use(morgan('dev'));
-
-// 4. Mapping Rotte
-app.use('/api/auth', authRoutes);
-app.use('/api/products', productRoutes);
-app.use('/api/members', memberRoutes);
-app.use('/api/admin', adminRoutes); 
-// In questo progetto NODE_ENV vale quanto APP_ENV ('dev' o 'prod'), quindi
-// non basta confrontarlo con 'production'
-const isProduction = ['prod', 'production'].includes(process.env.NODE_ENV);
-
-// SICUREZZA: la Debug API esiste solo se abilitata esplicitamente (mai in produzione)
-if (process.env.ENABLE_DEBUG_API === 'true' && !isProduction) {
-    app.use('/api/debug', debugRoutes);
-    console.warn('[SECURITY] Debug API abilitata: da NON usare su istanze pubbliche.');
-}
-app.use('/api/public', publicRoutes);
-
-// Health Check per Docker/LoadBalancer
-app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date() }));
-
-// Global Error Handler
-app.use((err, req, res, next) => {
-    console.error("[Fatal Error]", err.message);
-    res.status(500).json({ error: 'Errore interno del server', details: err.message });
-});
-
-// 5. Avvio Server con Retry Logic (Self-Healing)
+// 2. Applicazione e risorse
+const app = require('./app');
+const { allowedOrigins } = require('./app');
+const pool = require('./config/db');
 const { migrate } = require('./db/migrate');
 const runScheduler = require('./cron/scheduler');
 
+const PORT = process.env.PORT || 3000;
+
+// 3. Avvio con attesa del database
 const startServer = async () => {
-    // 5a. Attesa del database (il container MySQL può essere più lento a partire)
+    // 3a. Attesa del database (il container MySQL può essere più lento a partire)
     let retries = 5;
     while (true) {
         try {
@@ -118,7 +57,7 @@ const startServer = async () => {
         }
     }
 
-    // 5b. Migrazioni dello schema (disattivabili con DB_AUTO_MIGRATE=false)
+    // 3b. Migrazioni dello schema (disattivabili con DB_AUTO_MIGRATE=false)
     if (process.env.DB_AUTO_MIGRATE !== 'false') {
         try {
             await migrate();
@@ -128,7 +67,7 @@ const startServer = async () => {
         }
     }
 
-    // 5c. Automazione del ciclo G1-G7
+    // 3c. Automazione del ciclo G1-G7
     runScheduler();
 
     app.listen(PORT, '0.0.0.0', () => {
