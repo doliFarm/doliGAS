@@ -1,0 +1,60 @@
+# doliGAS - integrazione continua
+# Ad ogni push e pull request: test del backend su un MySQL vero e build del frontend.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    name: Test del backend
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h localhost -uroot -proot"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: root
+      # Con la password di root i test creano da soli il database doligas_test
+      DB_ROOT_PASSWORD: root
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - run: npm install --no-audit --no-fund
+      - name: Controllo della sintassi
+        run: find . -name '*.js' -not -path './node_modules/*' -print0 | xargs -0 -n1 node --check
+      - run: npm test
+
+  frontend:
+    name: Build del frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - run: npm install --no-audit --no-fund
+      - name: Le traduzioni sono JSON validi
+        run: for f in src/locales/*.json; do node -e "JSON.parse(require('fs').readFileSync('$f','utf8'))" || exit 1; done
+      - run: npm run build
