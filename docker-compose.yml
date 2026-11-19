@@ -14,6 +14,9 @@ services:
     env_file:
       - .env
     environment:
+      # Time zone of the GAS: cycle dates are stored as wall-clock time, so the
+      # database (NOW()) and the API (new Date()) must use the same zone
+      TZ: ${APP_TZ:-Europe/Rome}
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
       MYSQL_DATABASE: ${DB_NAME}
       MYSQL_USER: ${DB_USER}
@@ -58,6 +61,9 @@ services:
     env_file:
       - .env
     environment:
+      # Time zone of the GAS: cycle dates are stored as wall-clock time, so the
+      # database (NOW()) and the API (new Date()) must use the same zone
+      TZ: ${APP_TZ:-Europe/Rome}
       DB_HOST: gashub-db
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
