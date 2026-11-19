@@ -74,6 +74,6 @@ In locale i container si avviano con `docker compose -f docker-compose.yml -f do
 - La ripartizione della pesatura usa `utils/allocation.js` (metodo dei resti maggiori): la somma delle quote è esattamente il totale ricevuto e le unità discrete restano numeri interi.
 
 ## Convenzioni
-- Commit in italiano, piccoli, uno per argomento, con la riga `Co-Authored-By: Claude ...` quando li fa Claude.
+- Commit in italiano, piccoli, uno per argomento. **Senza righe di firma**: niente `Co-Authored-By` né `Claude-Session` nei messaggi di commit e nelle descrizioni delle pull request.
 - Commenti nel codice in italiano. Dopo ogni modifica a un file JS: `node --check <file>`.
 - Prima di modificare il comportamento del ciclo o del wallet, chiedi conferma a Luigi.
