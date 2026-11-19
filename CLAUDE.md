@@ -84,6 +84,8 @@ In locale i container si avviano con `docker compose -f docker-compose.yml -f do
 - La ripartizione della pesatura usa `utils/allocation.js` (metodo dei resti maggiori): la somma delle quote è esattamente il totale ricevuto e le unità discrete restano numeri interi.
 
 ## Convenzioni
-- Commit in italiano, piccoli, uno per argomento. **Senza righe di firma**: niente `Co-Authored-By` né `Claude-Session` nei messaggi di commit e nelle descrizioni delle pull request.
-- Commenti nel codice in italiano. Dopo ogni modifica a un file JS: `node --check <file>`.
+- **Tutto ciò che va su GitHub è in inglese**: messaggi di commit, titoli e descrizioni delle pull request, commenti. Commit piccoli, uno per argomento. **Senza righe di firma**: niente `Co-Authored-By` né `Claude-Session` nei messaggi di commit e nelle descrizioni delle pull request.
+- **Commenti nel codice in inglese.** I messaggi rivolti agli utenti (errori delle API, log, interfaccia) restano in italiano, o passano da i18n.
+- **Licenza AGPL-3.0-or-later.** Ogni file di codice (JS/JSX, SQL di seed e strumenti) comincia con il preambolo della licenza (copyright "Luigi Grillo (doliFarm)", riga `SPDX-License-Identifier: AGPL-3.0-or-later`): copialo da un file esistente quando ne crei uno nuovo. Fanno eccezione le migrazioni già applicate, che non si toccano (checksum); le migrazioni nuove lo includono.
+- Dopo ogni modifica a un file JS: `node --check <file>`.
 - Prima di modificare il comportamento del ciclo o del wallet, chiedi conferma a Luigi.
